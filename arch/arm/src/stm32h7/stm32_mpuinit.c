@@ -46,6 +46,22 @@
 #endif
 
 /****************************************************************************
+ * Private Functions
+ ****************************************************************************/
+
+static void stm32_mpu_user_intsram(uintptr_t start, size_t size)
+{
+  /* Keep protected user SRAM Normal, cacheable and non-shareable so that
+   * LDREX/STREX use the CPU-local exclusive monitor on STM32H7.
+   */
+
+  mpu_configure_region(start, size,
+                       MPU_RASR_TEX_SO |
+                       MPU_RASR_C |
+                       MPU_RASR_AP_RWRW);
+}
+
+/****************************************************************************
  * Public Functions
  ****************************************************************************/
 
@@ -79,7 +95,7 @@ void stm32_mpuinitialize(void)
   mpu_user_flash(USERSPACE->us_textstart,
                  USERSPACE->us_textend - USERSPACE->us_textstart);
 
-  mpu_user_intsram(datastart, dataend - datastart);
+  stm32_mpu_user_intsram(datastart, dataend - datastart);
 
   /* Then enable the MPU */
 
@@ -98,7 +114,7 @@ void stm32_mpuinitialize(void)
 
 void stm32_mpu_uheap(uintptr_t start, size_t size)
 {
-  mpu_user_intsram(start, size);
+  stm32_mpu_user_intsram(start, size);
 }
 
 #endif /* CONFIG_BUILD_PROTECTED && CONFIG_ARM_MPU */
