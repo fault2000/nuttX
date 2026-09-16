@@ -28,7 +28,7 @@
     defined(CONFIG_SCHED_SPORADIC) || defined(CONFIG_TLS_ALIGNED) || \
     defined(CONFIG_MM_KERNEL_HEAP) || defined(CONFIG_ARMV7M_STACKCHECK) || \
     defined(CONFIG_SUPPRESS_INTERRUPTS) || defined(CONFIG_SCHED_STARTHOOK) || \
-    defined(CONFIG_HAVE_CXXINITIALIZE)
+    defined(CONFIG_HAVE_CXXINITIALIZE) || defined(CONFIG_ARCH_HIPRI_INTERRUPT)
 #  error "Unsupported TRUST-RAM context-hook rollback profile"
 #endif
 
@@ -37,6 +37,28 @@
 #include <stdint.h>
 
 struct tcb_s;
+
+/* IRQ handoff boundaries for host integration only. enter validates or
+ * terminates before ordinary LED/ack/dispatch callbacks. The interrupted
+ * owner comes from protected active ownership, never the scheduler's possibly
+ * already changed this_task()/CURRENT_REGS mirrors. A separately authorized,
+ * immutable early capture must exist before any ordinary writer or callback;
+ * copying a stack at this C boundary does NOT establish that provenance.
+ * Nested entry is rejected by arm_doirq before the service is called.
+ *
+ * return validates the final candidate after every ordinary callback and
+ * CURRENT_REGS clearing. Intermediate scheduler selections do not enter or
+ * resume an owner. The service supplies only the approved ordinary frame,
+ * restored from a protected initial image/continuation. Its protected source,
+ * restore plan and every hardware-referenced frame remain live and immutable
+ * until assembly has finished using them. A successful metadata handoff is
+ * NOT hardware quiescence and never authorizes reclaiming an outgoing stack.
+ * Failures terminate; there is no fallback to the candidate frame. Actual
+ * assembly capture/restore, caller CFI and all-writer protection are absent.
+ */
+
+void up_trustram_irq_enter(int irq, uint32_t *regs);
+uint32_t *up_trustram_irq_return(int irq, uint32_t *candidate);
 
 /* Exact native function signatures for the supported Flat ABI. Keep this
  * header independent of scheduler/pthread structure definitions.

@@ -30,6 +30,9 @@
 #include <nuttx/irq.h>
 #include <nuttx/arch.h>
 #include <nuttx/board.h>
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+#  include <nuttx/trustram_context.h>
+#endif
 #include <arch/board/board.h>
 
 #include "arm_internal.h"
@@ -40,6 +43,20 @@
 
 uint32_t *arm_doirq(int irq, uint32_t *regs)
 {
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+  /* Host-only integration boundary. Nested entry must stop before ordinary
+   * callbacks or CURRENT_REGS updates. The service requires a separately
+   * authorized early capture; reaching this C function does not supply it.
+   */
+
+  if (CURRENT_REGS != NULL)
+    {
+      PANIC();
+    }
+
+  up_trustram_irq_enter(irq, regs);
+#endif
+
   board_autoled_on(LED_INIRQ);
 #ifdef CONFIG_SUPPRESS_INTERRUPTS
   PANIC();
@@ -85,5 +102,12 @@ uint32_t *arm_doirq(int irq, uint32_t *regs)
 #endif
 
   board_autoled_off(LED_INIRQ);
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+  /* This must follow every ordinary callback. Only the final selection is
+   * committed, after CURRENT_REGS is cleared and before assembly restores.
+   */
+
+  regs = up_trustram_irq_return(irq, regs);
+#endif
   return regs;
 }
