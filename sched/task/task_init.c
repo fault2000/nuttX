@@ -34,6 +34,10 @@
 #include <nuttx/arch.h>
 #include <nuttx/sched.h>
 
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+#  include <nuttx/trustram_context.h>
+#endif
+
 #include "sched/sched.h"
 #include "environ/environ.h"
 #include "group/group.h"
@@ -89,6 +93,11 @@ int nxtask_init(FAR struct task_tcb_s *tcb, const char *name, int priority,
 {
   uint8_t ttype = tcb->cmn.flags & TCB_FLAG_TTYPE_MASK;
   int ret;
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+  bool stack_acquired = false;
+  bool context_prepared = false;
+  bool scheduler_published = false;
+#endif
 
 #ifndef CONFIG_DISABLE_PTHREAD
   /* Only tasks and kernel threads can be initialized in this way */
@@ -140,6 +149,17 @@ int nxtask_init(FAR struct task_tcb_s *tcb, const char *name, int priority,
 
   /* Initialize thread local storage */
 
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+  stack_acquired = true;
+  ret = up_trustram_context_prepare(&tcb->cmn, stack != NULL);
+  if (ret < OK)
+    {
+      goto errout_with_group;
+    }
+
+  context_prepared = true;
+#endif
+
   ret = tls_init_info(&tcb->cmn);
   if (ret < OK)
     {
@@ -157,6 +177,10 @@ int nxtask_init(FAR struct task_tcb_s *tcb, const char *name, int priority,
 
   /* Setup to pass parameters to the new task */
 
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+  scheduler_published = true;
+#endif
+
   ret = nxtask_setup_arguments(tcb, name, argv);
   if (ret < OK)
     {
@@ -165,10 +189,34 @@ int nxtask_init(FAR struct task_tcb_s *tcb, const char *name, int priority,
 
   /* Now we have enough in place that we can join the group */
 
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+  ret = up_trustram_context_seal(&tcb->cmn);
+  if (ret < OK)
+    {
+      goto errout_with_group;
+    }
+#endif
+
   group_initialize(tcb);
   return ret;
 
 errout_with_group:
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+  if (scheduler_published)
+    {
+      nxsched_rollback_inactive(&tcb->cmn);
+    }
+
+  if (context_prepared)
+    {
+      up_trustram_context_abort(&tcb->cmn);
+    }
+
+  if (stack_acquired)
+    {
+      up_release_stack(&tcb->cmn, ttype);
+    }
+#else
   if (!stack && tcb->cmn.stack_alloc_ptr)
     {
 #ifdef CONFIG_BUILD_KERNEL
@@ -188,6 +236,7 @@ errout_with_group:
           up_release_stack(&tcb->cmn, ttype);
         }
     }
+#endif /* CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS */
 
   group_leave(&tcb->cmn);
   return ret;
@@ -219,6 +268,10 @@ void nxtask_uninit(FAR struct task_tcb_s *tcb)
    */
 
   dq_rem((FAR dq_entry_t *)tcb, (FAR dq_queue_t *)&g_inactivetasks);
+
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+  up_trustram_context_abort(&tcb->cmn);
+#endif
 
   /* Release all resources associated with the TCB... Including the TCB
    * itself.

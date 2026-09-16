@@ -44,6 +44,10 @@
 #include <nuttx/drivers/drivers.h>
 #include <nuttx/init.h>
 
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+#  include <nuttx/trustram_context.h>
+#endif
+
 #include "sched/sched.h"
 #include "signal/signal.h"
 #include "semaphore/semaphore.h"
@@ -309,6 +313,26 @@ static const char g_idlename[] = "Idle Task";
 
 static FAR char *g_idleargv[CONFIG_SMP_NCPUS][2];
 
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+/****************************************************************************
+ * Private Functions
+ ****************************************************************************/
+
+static void nx_trustram_idle_initialize(struct tcb_s *tcb)
+{
+  int ret;
+
+  up_initial_state(tcb);
+  ret = tls_init_info(tcb);
+  if (ret < OK)
+    {
+      PANIC();
+    }
+
+  up_trustram_idle_complete(tcb);
+}
+#endif
+
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
@@ -541,6 +565,9 @@ void nx_start(void)
         }
 #endif
 
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+      nx_trustram_idle_initialize(&g_idletcb[i].cmn);
+#else
       /* Initialize the processor-specific portion of the TCB */
 
       up_initial_state(&g_idletcb[i].cmn);
@@ -548,6 +575,7 @@ void nx_start(void)
       /* Initialize the thread local storage */
 
       tls_init_info(&g_idletcb[i].cmn);
+#endif
 
       /* Complete initialization of the IDLE group.  Suppress retention
        * of child status in the IDLE group.

@@ -31,6 +31,12 @@
 #include <nuttx/arch.h>
 #include <nuttx/sched.h>
 
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+#  include <assert.h>
+#  include <nuttx/irq.h>
+#  include <nuttx/trustram_context.h>
+#endif
+
 #include "sched/sched.h"
 #include "group/group.h"
 #include "timer/timer.h"
@@ -73,6 +79,37 @@ static void nxsched_releasepid(pid_t pid)
  * Public Functions
  ****************************************************************************/
 
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+/****************************************************************************
+ * Name: nxsched_rollback_inactive
+ *
+ * Description:
+ *   Undo scheduler setup for a never-activated creation transaction.
+ *   The PID/inactive entry exists, but activation has not occurred. This
+ *   deliberately does not free the caller-owned TCB, stack, group or owner
+ *   reservation. The host-only profile rejects configurations with parent,
+ *   D-space, CPU-load, or other additional rollback obligations.
+ ****************************************************************************/
+
+void nxsched_rollback_inactive(FAR struct tcb_s *tcb)
+{
+  irqstate_t flags = enter_critical_section();
+
+  if (tcb == NULL || tcb->pid <= 0 ||
+      tcb->task_state != TSTATE_TASK_INACTIVE ||
+      g_pidhash[PIDHASH(tcb->pid)] != tcb)
+    {
+      PANIC();
+    }
+
+  dq_rem((FAR dq_entry_t *)tcb, (FAR dq_queue_t *)&g_inactivetasks);
+  nxsched_releasepid(tcb->pid);
+  tcb->pid = 0;
+  tcb->task_state = TSTATE_TASK_INVALID;
+  leave_critical_section(flags);
+}
+#endif
+
 /****************************************************************************
  * Name: nxsched_release_tcb
  *
@@ -101,6 +138,10 @@ int nxsched_release_tcb(FAR struct tcb_s *tcb, uint8_t ttype)
 
   if (tcb)
     {
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+      up_trustram_context_release(tcb);
+#endif
+
 #ifndef CONFIG_DISABLE_POSIX_TIMERS
       /* Release any timers that the task might hold.  We do this
        * before release the PID because it may still be trying to
@@ -129,10 +170,14 @@ int nxsched_release_tcb(FAR struct tcb_s *tcb, uint8_t ttype)
 
       /* Delete the thread's stack if one has been allocated */
 
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+      up_release_stack(tcb, ttype);
+#else
       if (tcb->stack_alloc_ptr)
         {
           up_release_stack(tcb, ttype);
         }
+#endif
 
 #ifdef CONFIG_PIC
       /* Delete the task's allocated DSpace region (external modules only) */
@@ -168,7 +213,11 @@ int nxsched_release_tcb(FAR struct tcb_s *tcb, uint8_t ttype)
 
       /* And, finally, release the TCB itself */
 
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+      up_trustram_context_free_tcb(tcb);
+#else
       kmm_free(tcb);
+#endif
     }
 
   return ret;

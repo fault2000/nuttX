@@ -35,6 +35,11 @@
 #include <nuttx/arch.h>
 #include <nuttx/tls.h>
 
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+#  include <errno.h>
+#  include <nuttx/trustram_context.h>
+#endif
+
 #include "arm_internal.h"
 
 /****************************************************************************
@@ -71,6 +76,33 @@
 
 int up_use_stack(struct tcb_s *tcb, void *stack, size_t stack_size)
 {
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+  struct trustram_stack_layout_s layout;
+  int ret;
+
+  if (tcb == NULL || stack == NULL)
+    {
+      return -EINVAL;
+    }
+
+  ret = up_trustram_stack_acquire(tcb, stack, stack_size,
+                                  tcb->flags & TCB_FLAG_TTYPE_MASK, &layout);
+  if (ret < OK)
+    {
+      return ret;
+    }
+
+  tcb->stack_alloc_ptr = layout.allocation;
+  tcb->stack_base_ptr = layout.base;
+  tcb->adj_stack_size = layout.size;
+  tcb->flags &= ~TCB_FLAG_FREE_STACK;
+
+#ifdef CONFIG_STACK_COLORATION
+  arm_stack_color(layout.base, layout.size);
+#endif
+
+  return OK;
+#else
 #ifdef CONFIG_TLS_ALIGNED
   /* Make certain that the user provided stack is properly aligned */
 
@@ -115,4 +147,5 @@ int up_use_stack(struct tcb_s *tcb, void *stack, size_t stack_size)
 #endif /* CONFIG_STACK_COLORATION */
 
   return OK;
+#endif /* CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS */
 }

@@ -34,6 +34,10 @@
 #include <nuttx/sched.h>
 #include <nuttx/tls.h>
 
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+#  include <nuttx/trustram_context.h>
+#endif
+
 #include "group/group.h"
 #include "sched/sched.h"
 #include "signal/signal.h"
@@ -75,6 +79,34 @@
 
 void nxtask_start(void)
 {
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+  FAR struct tcb_s *tcb = this_task();
+  struct trustram_task_start_s plan;
+
+  up_trustram_task_start(tcb, &plan);
+
+#ifdef CONFIG_SIG_DEFAULT
+  if (!plan.kernel)
+    {
+      nxsig_default_initialize(tcb);
+    }
+#endif
+
+  if (plan.kernel)
+    {
+      plan.entry = up_trustram_task_entry(plan.entry, plan.argc,
+                                          plan.argv, true);
+      exit(plan.entry(plan.argc, plan.argv));
+    }
+  else
+    {
+      nxtask_startup(plan.entry, plan.argc, plan.argv);
+    }
+
+  /* The startup/exit services must not return to this initial entry point. */
+
+  PANIC();
+#else
   FAR struct task_tcb_s *tcb = (FAR struct task_tcb_s *)this_task();
   int exitcode = EXIT_FAILURE;
   int argc;
@@ -142,4 +174,5 @@ void nxtask_start(void)
   /* Call exit() if/when the task returns */
 
   exit(exitcode);
+#endif /* CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS */
 }

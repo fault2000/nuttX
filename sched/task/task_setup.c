@@ -37,6 +37,10 @@
 #include <nuttx/signal.h>
 #include <nuttx/tls.h>
 
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+#  include <nuttx/trustram_context.h>
+#endif
+
 #include "sched/sched.h"
 #include "pthread/pthread.h"
 #include "group/group.h"
@@ -371,6 +375,15 @@ static int nxthread_setup_scheduler(FAR struct tcb_s *tcb, int priority,
                                     uint8_t ttype)
 {
   int ret;
+
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+  ret = up_trustram_context_check_create(tcb, (uintptr_t)start,
+                                        (uintptr_t)entry, ttype);
+  if (ret < OK)
+    {
+      return ret;
+    }
+#endif
 
   /* Assign a unique task ID to the task. */
 

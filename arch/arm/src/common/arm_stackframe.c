@@ -32,6 +32,10 @@
 #include <nuttx/arch.h>
 #include <arch/irq.h>
 
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+#  include <nuttx/trustram_context.h>
+#endif
+
 #include "arm_internal.h"
 
 /****************************************************************************
@@ -71,6 +75,20 @@
 
 void *up_stack_frame(struct tcb_s *tcb, size_t frame_size)
 {
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+  struct trustram_stack_frame_s frame;
+
+  if (up_trustram_stack_carve(tcb, frame_size, &frame) < OK)
+    {
+      return NULL;
+    }
+
+  memset(frame.frame, 0, frame.size);
+  tcb->stack_alloc_ptr = frame.remaining.allocation;
+  tcb->stack_base_ptr = frame.remaining.base;
+  tcb->adj_stack_size = frame.remaining.size;
+  return frame.frame;
+#else
   void *ret;
 
   /* Align the frame_size */
@@ -95,4 +113,5 @@ void *up_stack_frame(struct tcb_s *tcb, size_t frame_size)
   /* And return the pointer to the allocated region */
 
   return ret;
+#endif /* CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS */
 }

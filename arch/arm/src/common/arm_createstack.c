@@ -37,6 +37,10 @@
 #include <nuttx/board.h>
 #include <arch/board/board.h>
 
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+#  include <nuttx/trustram_context.h>
+#endif
+
 #include "arm_internal.h"
 
 /****************************************************************************
@@ -83,6 +87,28 @@
 
 int up_create_stack(struct tcb_s *tcb, size_t stack_size, uint8_t ttype)
 {
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+  struct trustram_stack_layout_s layout;
+  int ret;
+
+  ret = up_trustram_stack_acquire(tcb, NULL, stack_size, ttype, &layout);
+  if (ret < OK)
+    {
+      return ret;
+    }
+
+  tcb->stack_alloc_ptr = layout.allocation;
+  tcb->stack_base_ptr = layout.base;
+  tcb->adj_stack_size = layout.size;
+  tcb->flags |= TCB_FLAG_FREE_STACK;
+
+#ifdef CONFIG_STACK_COLORATION
+  arm_stack_color(layout.base, layout.size);
+#endif
+
+  board_autoled_on(LED_STACKCREATED);
+  return OK;
+#else
 #ifdef CONFIG_TLS_ALIGNED
   /* The allocated stack size must not exceed the maximum possible for the
    * TLS feature.
@@ -197,4 +223,5 @@ int up_create_stack(struct tcb_s *tcb, size_t stack_size, uint8_t ttype)
     }
 
   return ERROR;
+#endif /* CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS */
 }

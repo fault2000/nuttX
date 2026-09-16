@@ -29,6 +29,10 @@
 #include <assert.h>
 #include <debug.h>
 
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+#  include <nuttx/trustram_context.h>
+#endif
+
 #include "libc.h"
 
 #ifndef CONFIG_BUILD_KERNEL
@@ -62,6 +66,10 @@ void nxtask_startup(main_t entrypt, int argc, FAR char *argv[])
    */
 
   lib_cxx_initialize();
+
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+  entrypt = up_trustram_task_entry(entrypt, argc, argv, false);
+#endif
 
   /* Call the 'main' entry point passing argc and argv, calling exit()
    * if/when the task returns.

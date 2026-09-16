@@ -31,6 +31,10 @@
 #include <nuttx/arch.h>
 #include <arch/armv7-m/nvicpri.h>
 
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+#  include <nuttx/trustram_context.h>
+#endif
+
 #include "arm_internal.h"
 #include "psr.h"
 #include "exc_return.h"
@@ -55,6 +59,31 @@
 
 void up_initial_state(struct tcb_s *tcb)
 {
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+  struct trustram_initial_state_s plan;
+
+  _Static_assert(XCPTCONTEXT_REGS == 53,
+                 "TRUST-RAM initial plan requires the fixed M7 frame");
+  _Static_assert(XCPTCONTEXT_SIZE == sizeof(plan.words),
+                 "TRUST-RAM initial plan size must match the M7 frame");
+
+  up_trustram_context_initial(tcb, &plan);
+
+  /* The service has approved the TCB binding and the complete write plan.
+   * A failed write after approval is fatal, not a resumable transaction.
+   */
+
+  memset(&tcb->xcp, 0, sizeof(struct xcptcontext));
+  tcb->stack_alloc_ptr = plan.stack.allocation;
+  tcb->stack_base_ptr = plan.stack.base;
+  tcb->adj_stack_size = plan.stack.size;
+
+  if (!plan.idle)
+    {
+      memcpy(plan.regs, plan.words, sizeof(plan.words));
+      tcb->xcp.regs = plan.regs;
+    }
+#else
   struct xcptcontext *xcp = &tcb->xcp;
 
   /* Initialize the initial exception register context structure */
@@ -165,4 +194,5 @@ void up_initial_state(struct tcb_s *tcb)
 #endif
 
 #endif /* CONFIG_SUPPRESS_INTERRUPTS */
+#endif /* CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS */
 }

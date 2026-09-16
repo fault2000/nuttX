@@ -41,6 +41,10 @@
 #include <nuttx/kmalloc.h>
 #include <nuttx/pthread.h>
 
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+#  include <nuttx/trustram_context.h>
+#endif
+
 #include "sched/sched.h"
 #include "group/group.h"
 #include "clock/clock.h"
@@ -150,6 +154,29 @@ static inline void pthread_addjoininfo(FAR struct task_group_s *group,
 
 static void pthread_start(void)
 {
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+  FAR struct tcb_s *tcb = this_task();
+  FAR struct pthread_tcb_s *ptcb;
+  struct trustram_pthread_start_s plan;
+
+  up_trustram_pthread_start(tcb, &plan);
+  ptcb = (FAR struct pthread_tcb_s *)tcb;
+
+  /* The binding is validated before ordinary scheduling fields are read.
+   * Lowering the priority can switch contexts; dispatch rechecks the active
+   * owner and the retained plan after this service returns.
+   */
+
+  if (ptcb->cmn.sched_priority > ptcb->cmn.init_priority)
+    {
+      VERIFY(nxsched_set_priority(&ptcb->cmn, ptcb->cmn.init_priority));
+    }
+
+  plan.trampoline = up_trustram_pthread_dispatch(plan.trampoline,
+                                                plan.entry, plan.arg);
+  plan.trampoline(plan.entry, plan.arg);
+  PANIC();
+#else
   FAR struct pthread_tcb_s *ptcb = (FAR struct pthread_tcb_s *)this_task();
   FAR struct join_s *pjoin = (FAR struct join_s *)ptcb->joininfo;
 
@@ -182,6 +209,7 @@ static void pthread_start(void)
 
   DEBUGPANIC();
   pthread_exit(NULL);
+#endif /* CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS */
 }
 
 /****************************************************************************
@@ -222,6 +250,11 @@ int nx_pthread_create(pthread_trampoline_t trampoline, FAR pthread_t *thread,
   pid_t pid;
   int ret;
   bool group_joined = false;
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+  bool context_prepared = false;
+  bool scheduler_published = false;
+  bool joinsem_initialized = false;
+#endif
 
   DEBUGASSERT(trampoline != NULL);
 
@@ -301,6 +334,17 @@ int nx_pthread_create(pthread_trampoline_t trampoline, FAR pthread_t *thread,
     }
 
   /* Initialize thread local storage */
+
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+  ret = up_trustram_context_prepare(&ptcb->cmn, attr->stackaddr != NULL);
+  if (ret < OK)
+    {
+      errcode = -ret;
+      goto errout_with_join;
+    }
+
+  context_prepared = true;
+#endif
 
   ret = tls_init_info(&ptcb->cmn);
   if (ret != OK)
@@ -412,9 +456,19 @@ int nx_pthread_create(pthread_trampoline_t trampoline, FAR pthread_t *thread,
                                 entry);
   if (ret != OK)
     {
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+      /* Preserve admission and PID-allocation errors from common setup. */
+
+      errcode = ret < 0 ? -ret : EBUSY;
+#else
       errcode = EBUSY;
+#endif
       goto errout_with_join;
     }
+
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+  scheduler_published = true;
+#endif
 
 #if defined(CONFIG_ARCH_ADDRENV) && defined(CONFIG_BUILD_KERNEL)
   /* Allocate the kernel stack */
@@ -504,12 +558,25 @@ int nx_pthread_create(pthread_trampoline_t trampoline, FAR pthread_t *thread,
    * as well.
    */
 
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+  ret = up_trustram_context_seal(&ptcb->cmn);
+  if (ret < OK)
+    {
+      errcode = -ret;
+      goto errout_with_join;
+    }
+#endif
+
   pid = ptcb->cmn.pid;
   pjoin->thread = (pthread_t)pid;
 
   /* Initialize the semaphore in the join structure to zero. */
 
   ret = nxsem_init(&pjoin->exit_sem, 0, 0);
+
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+  joinsem_initialized = ret == OK;
+#endif
 
   if (ret < 0)
     {
@@ -576,8 +643,10 @@ int nx_pthread_create(pthread_trampoline_t trampoline, FAR pthread_t *thread,
   else
     {
       sched_unlock();
+#ifndef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
       dq_rem((FAR dq_entry_t *)ptcb, (FAR dq_queue_t *)&g_inactivetasks);
       nxsem_destroy(&pjoin->exit_sem);
+#endif
 
       errcode = EIO;
       goto errout_with_join;
@@ -586,10 +655,29 @@ int nx_pthread_create(pthread_trampoline_t trampoline, FAR pthread_t *thread,
   return ret;
 
 errout_with_join:
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+  if (joinsem_initialized)
+    {
+      nxsem_destroy(&pjoin->exit_sem);
+    }
+#endif
+
   kmm_free(pjoin);
   ptcb->joininfo = NULL;
 
 errout_with_tcb:
+
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+  if (scheduler_published)
+    {
+      nxsched_rollback_inactive(&ptcb->cmn);
+    }
+
+  if (context_prepared)
+    {
+      up_trustram_context_abort(&ptcb->cmn);
+    }
+#endif
 
   /* Clear group binding */
 

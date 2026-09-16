@@ -28,6 +28,10 @@
 
 #include <nuttx/pthread.h>
 
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+#  include <nuttx/trustram_context.h>
+#endif
+
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
@@ -55,6 +59,10 @@ static void pthread_startup(pthread_startroutine_t entry,
   DEBUGASSERT(entry != NULL);
 
   /* Pass control to the thread entry point.  Handle any returned value. */
+
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+  entry = up_trustram_pthread_entry(entry, arg);
+#endif
 
   pthread_exit(entry(arg));
 }

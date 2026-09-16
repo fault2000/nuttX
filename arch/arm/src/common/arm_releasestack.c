@@ -30,6 +30,10 @@
 #include <nuttx/arch.h>
 #include <nuttx/kmalloc.h>
 
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+#  include <nuttx/trustram_context.h>
+#endif
+
 #include "arm_internal.h"
 
 /****************************************************************************
@@ -69,6 +73,10 @@
 
 void up_release_stack(struct tcb_s *dtcb, uint8_t ttype)
 {
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+  (void)ttype;
+  up_trustram_stack_release(dtcb);
+#else
   /* Is there a stack allocated? */
 
   if (dtcb->stack_alloc_ptr && (dtcb->flags & TCB_FLAG_FREE_STACK))
@@ -88,6 +96,7 @@ void up_release_stack(struct tcb_s *dtcb, uint8_t ttype)
           kumm_free(dtcb->stack_alloc_ptr);
         }
     }
+#endif /* CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS */
 
   /* Mark the stack freed */
 

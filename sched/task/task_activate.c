@@ -32,6 +32,10 @@
 #include <nuttx/arch.h>
 #include <nuttx/sched_note.h>
 
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+#  include <nuttx/trustram_context.h>
+#endif
+
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
@@ -56,6 +60,10 @@
 void nxtask_activate(FAR struct tcb_s *tcb)
 {
   irqstate_t flags = enter_critical_section();
+
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+  up_trustram_context_activate(tcb);
+#endif
 
 #ifdef CONFIG_SCHED_INSTRUMENTATION
 
