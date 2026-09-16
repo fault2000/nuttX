@@ -147,6 +147,28 @@
 #  undef HAVE_DTCM
 #endif
 
+/* A Flat board may reserve the end of DTCM for memory that must not be
+ * colored or registered with the general heap.  This contract does not
+ * apply to the separate DTCM allocator or to protected user heaps.
+ */
+
+#ifndef BOARD_DTCM_RSVD_TAIL_SIZE
+#  define BOARD_DTCM_RSVD_TAIL_SIZE 0
+#endif
+
+#if BOARD_DTCM_RSVD_TAIL_SIZE < 0
+#  error "BOARD_DTCM_RSVD_TAIL_SIZE must not be negative"
+#elif BOARD_DTCM_RSVD_TAIL_SIZE > 0
+#  if !defined(HAVE_DTCM) || !defined(CONFIG_ARMV7M_DTCM)
+#    error "BOARD_DTCM_RSVD_TAIL_SIZE requires enabled general-heap DTCM"
+#  elif BOARD_DTCM_RSVD_TAIL_SIZE >= (DTCM_END - DTCM_START)
+#    error "BOARD_DTCM_RSVD_TAIL_SIZE must leave a nonempty DTCM heap"
+#  endif
+#  if !defined(CONFIG_BUILD_FLAT)
+#    error "BOARD_DTCM_RSVD_TAIL_SIZE requires a Flat build"
+#  endif
+#endif
+
 /****************************************************************************
  * Private Data
  ****************************************************************************/
@@ -165,6 +187,14 @@ extern const uint32_t _sram4_heap_start;
  */
 
 const uintptr_t g_board_sram123_heap_start = SRAM123_HEAP_START;
+#endif
+
+#if BOARD_DTCM_RSVD_TAIL_SIZE > 0
+/* Export and consume the actual boundary, so the board can compare its
+ * linker reservation against the same value used for heap registration.
+ */
+
+const uintptr_t g_board_dtcm_heap_end = DTCM_END - BOARD_DTCM_RSVD_TAIL_SIZE;
 #endif
 
 /****************************************************************************
@@ -399,7 +429,11 @@ void arm_addregion(void)
 #ifdef HAVE_DTCM
   if (mm_regions < CONFIG_MM_REGIONS)
     {
+#if BOARD_DTCM_RSVD_TAIL_SIZE > 0
+      addregion (DTCM_START, g_board_dtcm_heap_end - DTCM_START, "DTCM");
+#else
       addregion (DTCM_START, DTCM_END - DTCM_START, "DTCM");
+#endif
       mm_regions++;
     }
 #endif
