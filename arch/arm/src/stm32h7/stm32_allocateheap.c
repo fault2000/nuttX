@@ -106,6 +106,23 @@
 #define SRAM123_START STM32_SRAM123_BASE
 #define SRAM123_END   (SRAM123_START + STM32H7_SRAM123_SIZE)
 
+/* A board may reserve the beginning of SRAM123 for memory that must never
+ * be colored or registered with the heap.  Reject invalid reservations
+ * before computing the remaining size so it cannot underflow.
+ */
+
+#ifndef BOARD_SRAM123_RSVD_SIZE
+#  define BOARD_SRAM123_RSVD_SIZE 0
+#endif
+
+#if BOARD_SRAM123_RSVD_SIZE < 0 || \
+    BOARD_SRAM123_RSVD_SIZE >= STM32H7_SRAM123_SIZE
+#  error "BOARD_SRAM123_RSVD_SIZE must leave a nonempty SRAM123 heap"
+#endif
+
+#define SRAM123_HEAP_START (SRAM123_START + BOARD_SRAM123_RSVD_SIZE)
+#define SRAM123_HEAP_SIZE  (STM32H7_SRAM123_SIZE - BOARD_SRAM123_RSVD_SIZE)
+
 #undef HAVE_SRAM4
 #if !defined(CONFIG_STM32H7_SRAM4EXCLUDE)
 #  define HAVE_SRAM4 1
@@ -136,6 +153,18 @@
 
 #ifdef HAVE_SRAM4
 extern const uint32_t _sram4_heap_start;
+#endif
+
+/****************************************************************************
+ * Public Data
+ ****************************************************************************/
+
+#if BOARD_SRAM123_RSVD_SIZE > 0
+/* Export the actual heap boundary so board initialization can verify that
+ * its linker reservation agrees with the allocator's reservation.
+ */
+
+const uintptr_t g_board_sram123_heap_start = SRAM123_HEAP_START;
 #endif
 
 /****************************************************************************
@@ -350,7 +379,12 @@ void arm_addregion(void)
 
   if (mm_regions < CONFIG_MM_REGIONS)
     {
-      addregion (SRAM123_START, SRAM123_END - SRAM123_START, "SRAM1,2,3");
+#if BOARD_SRAM123_RSVD_SIZE > 0
+      addregion (g_board_sram123_heap_start,
+                 SRAM123_END - g_board_sram123_heap_start, "SRAM1,2,3");
+#else
+      addregion (SRAM123_HEAP_START, SRAM123_HEAP_SIZE, "SRAM1,2,3");
+#endif
       mm_regions++;
     }
 
