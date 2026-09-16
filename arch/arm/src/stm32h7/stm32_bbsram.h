@@ -91,6 +91,29 @@ extern "C"
  * Public Function Prototypes
  ****************************************************************************/
 
+#ifdef CONFIG_STM32H7_BBSRAM_BOARD_MPU
+/****************************************************************************
+ * Function: board_bbsram_mpu_check
+ *
+ * Description:
+ *   Verify the board-owned MPU policy before this driver first accesses
+ *   BBSRAM.  The board must already provide a non-cacheable, execute-never
+ *   mapping with suitable read/write access to all STM32H7_BBSRAM_SIZE bytes
+ *   at STM32_BBSRAM_BASE.  The driver does not change the MPU in this mode.
+ *
+ *   This check is required even if D-cache is disabled.  The board must
+ *   ensure that every other BBSRAM CPU access also follows policy setup.
+ *   There is no default implementation; the board must supply this hook.
+ *
+ * Returned Value:
+ *   OK if the policy is ready; a negated errno otherwise.  Failure aborts
+ *   driver initialization before backing-memory access or registration.
+ *
+ ****************************************************************************/
+
+int board_bbsram_mpu_check(void);
+#endif
+
 /****************************************************************************
  * Function: stm32_bbsraminitialize
  *

@@ -815,7 +815,18 @@ int stm32_bbsraminitialize(char *devpath, int *sizes)
       return -EINVAL;
     }
 
-#if defined(CONFIG_ARMV7M_DCACHE)
+#if defined(CONFIG_STM32H7_BBSRAM_BOARD_MPU)
+  /* Check the board-owned mapping before the first backing-memory access.
+   * The board owns MPU region allocation and control settings in this mode.
+   */
+
+  ret = board_bbsram_mpu_check();
+  if (ret != OK)
+    {
+      return ret < OK ? ret : -EIO;
+    }
+
+#elif defined(CONFIG_ARMV7M_DCACHE)
   /* ST placed the H7's BBSRAM in the default region for SRAM so we need to
    * make it not cacheable
    */

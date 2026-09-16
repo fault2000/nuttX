@@ -1689,6 +1689,21 @@ config STM32H7_BBSRAM
 	default n
 	select ARM_MPU
 
+config STM32H7_BBSRAM_BOARD_MPU
+	bool "Board-owned BBSRAM MPU policy"
+	default n
+	depends on STM32H7_BBSRAM && ARM_MPU && BUILD_FLAT
+	---help---
+		Let the board own the BBSRAM MPU mapping and MPU control settings.
+		The board must implement board_bbsram_mpu_check() to verify that
+		its policy already provides non-cacheable, execute-never BBSRAM
+		access before the driver accesses the backing memory. A failure
+		must return a negated errno; the driver aborts initialization.
+
+		When selected, the driver does not allocate an MPU region or
+		change MPU control settings, regardless of D-cache configuration.
+		Other BBSRAM users must also obey the board's initialization order.
+
 config STM32H7_BBSRAM_FILES
 	int "Max Files to support in BBSRAM"
 	default 4
