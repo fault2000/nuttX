@@ -67,6 +67,9 @@
 
 extern void board_trustram_boot_idle_entry_probe(void);
 #endif
+#ifdef TRUSTRAM_BOOT_IDLE_LIFECYCLE_PROBE
+#  include <nuttx/trustram_boot_idle.h>
+#endif
 
 #include "sched/sched.h"
 #include "signal/signal.h"
@@ -585,10 +588,15 @@ void nx_start(void)
     }
 
   g_pidhash = kmm_zalloc(sizeof(*g_pidhash) * g_npidhash);
-#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+#if defined(CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS) || \
+    defined(TRUSTRAM_BOOT_IDLE_LIFECYCLE_PROBE)
   if (g_pidhash == NULL)
     {
+#ifdef TRUSTRAM_BOOT_IDLE_LIFECYCLE_PROBE
+      board_trustram_boot_fault();
+#else
       PANIC();
+#endif
     }
 #else
   DEBUGASSERT(g_pidhash);
@@ -607,10 +615,15 @@ void nx_start(void)
 
       /* Allocate the IDLE group */
 
-#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+#if defined(CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS) || \
+    defined(TRUSTRAM_BOOT_IDLE_LIFECYCLE_PROBE)
       if (group_allocate(&g_idletcb[i], g_idletcb[i].cmn.flags) < OK)
         {
+#ifdef TRUSTRAM_BOOT_IDLE_LIFECYCLE_PROBE
+          board_trustram_boot_fault();
+#else
           PANIC();
+#endif
         }
 #else
       DEBUGVERIFY(group_allocate(&g_idletcb[i], g_idletcb[i].cmn.flags));
@@ -631,6 +644,8 @@ void nx_start(void)
 
 #ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
       nx_trustram_idle_initialize(&g_idletcb[i].cmn);
+#elif defined(TRUSTRAM_BOOT_IDLE_LIFECYCLE_PROBE)
+      board_trustram_boot_idle_lifecycle_entry_probe();
 #else
       /* Initialize the processor-specific portion of the TCB */
 

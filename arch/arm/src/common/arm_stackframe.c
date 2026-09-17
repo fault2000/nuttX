@@ -35,6 +35,9 @@
 #ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
 #  include <nuttx/trustram_context.h>
 #endif
+#ifdef TRUSTRAM_BOOT_IDLE_LIFECYCLE_PROBE
+#  include <nuttx/trustram_boot_idle.h>
+#endif
 
 #include "arm_internal.h"
 
@@ -75,7 +78,16 @@
 
 void *up_stack_frame(struct tcb_s *tcb, size_t frame_size)
 {
-#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+#ifdef TRUSTRAM_BOOT_IDLE_LIFECYCLE_PROBE
+  struct trustram_boot_idle_frame_s frame;
+
+  board_trustram_boot_idle_carve_probe(tcb, frame_size, &frame);
+  memset(frame.frame, 0, frame.size);
+  tcb->stack_alloc_ptr = frame.remaining.allocation;
+  tcb->stack_base_ptr = frame.remaining.base;
+  tcb->adj_stack_size = frame.remaining.size;
+  return frame.frame;
+#elif defined(CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS)
   struct trustram_stack_frame_s frame;
 
   if (up_trustram_stack_carve(tcb, frame_size, &frame) < OK)

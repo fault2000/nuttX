@@ -34,6 +34,9 @@
 #ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
 #  include <nuttx/trustram_context.h>
 #endif
+#ifdef TRUSTRAM_BOOT_IDLE_LIFECYCLE_PROBE
+#  include <nuttx/trustram_boot_idle.h>
+#endif
 
 #include "arm_internal.h"
 #include "psr.h"
@@ -59,7 +62,15 @@
 
 void up_initial_state(struct tcb_s *tcb)
 {
-#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+#ifdef TRUSTRAM_BOOT_IDLE_LIFECYCLE_PROBE
+  struct trustram_boot_idle_stack_s stack;
+
+  board_trustram_boot_idle_initial_probe(tcb, &stack);
+  memset(&tcb->xcp, 0, sizeof(struct xcptcontext));
+  tcb->stack_alloc_ptr = stack.allocation;
+  tcb->stack_base_ptr = stack.base;
+  tcb->adj_stack_size = stack.size;
+#elif defined(CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS)
   struct trustram_initial_state_s plan;
 
   _Static_assert(XCPTCONTEXT_REGS == 53,
