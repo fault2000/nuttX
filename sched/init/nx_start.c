@@ -48,6 +48,10 @@
 #  include <nuttx/trustram_context.h>
 #endif
 
+#ifdef TRUSTRAM_BOOT_LAYOUT_PROBE
+#  include <nuttx/trustram_boot_layout.h>
+#endif
+
 #include "sched/sched.h"
 #include "signal/signal.h"
 #include "semaphore/semaphore.h"
@@ -295,6 +299,29 @@ uint8_t g_nx_initstate;  /* See enum nx_initstate_e */
  */
 
 static struct task_tcb_s g_idletcb[CONFIG_SMP_NCPUS];
+
+#ifdef TRUSTRAM_BOOT_LAYOUT_PROBE
+#  if !defined(CONFIG_BUILD_FLAT) || defined(CONFIG_SMP) || \
+      CONFIG_SMP_NCPUS != 1
+#    error "Detached idle layout requires Flat single-CPU startup"
+#  endif
+
+_Static_assert(offsetof(struct task_tcb_s, cmn) == 0,
+               "Idle identity must denote the complete native TCB");
+
+/* Preserve the private object's identity without exporting a writable TCB
+ * symbol or inferring its address from scheduler lists or ordinary fields.
+ * This probe does not change startup writes or install runtime admission.
+ */
+
+const struct trustram_boot_idle_object g_trustram_boot_idle_object
+  __attribute__((section(".rodata.trustram_boot_idle_object"), used)) =
+{
+  (uintptr_t)&g_idletcb[0].cmn,
+  sizeof(g_idletcb[0]),
+  _Alignof(struct task_tcb_s)
+};
+#endif
 
 /* This is the name of the idle task */
 
