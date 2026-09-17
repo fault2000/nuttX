@@ -207,7 +207,7 @@
 #define USART_CR1_M1              (1 << 28) /* Bit 28: Word length, bit 1 */
 #define USART_CR1_FIFOEN          (1 << 29) /* Bit 29: FIFO mode enable */
 #define USART_CR1_TXFEIE          (1 << 30) /* Bit 30: TXFIFO empty interrupt enable */
-#define USART_CR1_RXFFIE          (1 << 31) /* Bit 31: RXFIFO Full interrupt enable */
+#define USART_CR1_RXFFIE          (1u << 31) /* Bit 31: RXFIFO Full interrupt enable */
 
 #define USART_CR1_ALLINTS \
   (USART_CR1_IDLEIE | USART_CR1_RXNEIE | USART_CR1_TCIE | USART_CR1_TXEIE |\
@@ -253,7 +253,7 @@
 #define USART_CR2_ADD4H_MASK      (15 << USART_CR2_ADD4H_SHIFT)
 #  define USART_CR2_ADD4H(n)      ((uint32_t)(n) << USART_CR2_ADD4H_SHIFT)
 #define USART_CR2_ADD8_SHIFT      (24)      /* Bits 24-31: Address[7:0] of the USART node */
-#define USART_CR2_ADD8_MASK       (255 << USART_CR2_ADD8_SHIFT)
+#define USART_CR2_ADD8_MASK       (255u << USART_CR2_ADD8_SHIFT)
 #  define USART_CR2_ADD8(n)       ((uint32_t)(n) << USART_CR2_ADD8_SHIFT)
 
 /* Control register 3 */
