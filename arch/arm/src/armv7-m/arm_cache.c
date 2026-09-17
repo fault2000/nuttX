@@ -255,7 +255,7 @@ void up_enable_dcache(void)
   ARM_DSB();
   do
     {
-      int32_t tmpways = ways;
+      uint32_t tmpways = ways;
 
       do
         {
@@ -342,7 +342,7 @@ void up_disable_dcache(void)
 
   do
     {
-      int32_t tmpways = ways;
+      uint32_t tmpways = ways;
 
       do
         {
@@ -496,7 +496,7 @@ void up_invalidate_dcache_all(void)
 
   do
     {
-      int32_t tmpways = ways;
+      uint32_t tmpways = ways;
 
       do
         {
@@ -648,7 +648,7 @@ void up_clean_dcache_all(void)
 
   do
     {
-      int32_t tmpways = ways;
+      uint32_t tmpways = ways;
 
       do
         {
@@ -802,7 +802,7 @@ void up_flush_dcache_all(void)
 
   do
     {
-      int32_t tmpways = ways;
+      uint32_t tmpways = ways;
 
       do
         {
