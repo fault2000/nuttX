@@ -45,6 +45,7 @@
 
 #include <nuttx/config.h>
 #include <nuttx/cache.h>
+#include <nuttx/irq.h>
 
 #include "arm_internal.h"
 #include "barriers.h"
@@ -97,6 +98,45 @@ static inline uint32_t arm_clz(unsigned int value)
   __asm__ __volatile__ ("clz %0, %1" : "=r"(ret) : "r"(value));
   return ret;
 }
+
+/****************************************************************************
+ * Private Functions
+ ****************************************************************************/
+
+/****************************************************************************
+ * Name: arm_dcache_ccsidr
+ *
+ * Description:
+ *   Read the L1 D-cache geometry while preserving the caller's cache selector
+ *   and PRIMASK.  Mask configurable interrupts only during this short
+ *   select/read/restore transaction, independently of the BASEPRI policy.
+ *   NMI and HardFault remain possible; any returning handler that changes
+ *   CSSELR must also save it and restore it with a DSB before returning.
+ *
+ ****************************************************************************/
+
+#ifdef CONFIG_ARMV7M_DCACHE
+static uint32_t arm_dcache_ccsidr(void)
+{
+  uint32_t primask;
+  uint32_t csselr;
+  uint32_t ccsidr;
+
+  primask = getprimask();
+  setprimask(1);
+
+  csselr = getreg32(NVIC_CSSELR);
+  putreg32(NVIC_CSSELR_LEVEL_1 | NVIC_CSSELR_IND_DCACHE, NVIC_CSSELR);
+  ARM_DSB();
+  ccsidr = getreg32(NVIC_CCSIDR);
+
+  putreg32(csselr, NVIC_CSSELR);
+  ARM_DSB();
+  setprimask(primask);
+
+  return ccsidr;
+}
+#endif /* CONFIG_ARMV7M_DCACHE */
 
 /****************************************************************************
  * Public Functions
@@ -232,7 +272,7 @@ void up_enable_dcache(void)
 
   /* Get the characteristics of the D-Cache */
 
-  ccsidr = getreg32(NVIC_CCSIDR);
+  ccsidr = arm_dcache_ccsidr();
   sets   = CCSIDR_SETS(ccsidr);          /* (Number of sets) - 1 */
   sshift = CCSIDR_LSSHIFT(ccsidr) + 4;   /* log2(cache-line-size-in-bytes) */
   ways   = CCSIDR_WAYS(ccsidr);          /* (Number of ways) - 1 */
@@ -312,7 +352,7 @@ void up_disable_dcache(void)
 
   /* Get the characteristics of the D-Cache */
 
-  ccsidr = getreg32(NVIC_CCSIDR);
+  ccsidr = arm_dcache_ccsidr();
   sets   = CCSIDR_SETS(ccsidr);          /* (Number of sets) - 1 */
   sshift = CCSIDR_LSSHIFT(ccsidr) + 4;   /* log2(cache-line-size-in-bytes) */
   ways   = CCSIDR_WAYS(ccsidr);          /* (Number of ways) - 1 */
@@ -386,20 +426,13 @@ void up_disable_dcache(void)
 void up_invalidate_dcache(uintptr_t start, uintptr_t end)
 {
   uint32_t ccsidr;
-  uint32_t csselr;
   uint32_t sshift;
   uint32_t ssize;
 
   /* Get the characteristics of the D-Cache */
 
-  csselr = getreg32(NVIC_CSSELR);
-  putreg32((csselr & ~NVIC_CSSELR_IND) |
-            NVIC_CSSELR_IND_DCACHE, NVIC_CSSELR);
-
-  ccsidr = getreg32(NVIC_CCSIDR);
+  ccsidr = arm_dcache_ccsidr();
   sshift = CCSIDR_LSSHIFT(ccsidr) + 4;   /* log2(cache-line-size-in-bytes) */
-
-  putreg32(csselr, NVIC_CSSELR);    /* restore csselr */
 
   /* Invalidate the D-Cache containing this range of addresses */
 
@@ -472,7 +505,7 @@ void up_invalidate_dcache_all(void)
 
   /* Get the characteristics of the D-Cache */
 
-  ccsidr = getreg32(NVIC_CCSIDR);
+  ccsidr = arm_dcache_ccsidr();
   sets   = CCSIDR_SETS(ccsidr);          /* (Number of sets) - 1 */
   sshift = CCSIDR_LSSHIFT(ccsidr) + 4;   /* log2(cache-line-size-in-bytes) */
   ways   = CCSIDR_WAYS(ccsidr);          /* (Number of ways) - 1 */
@@ -548,7 +581,7 @@ void up_clean_dcache(uintptr_t start, uintptr_t end)
 
   /* Get the characteristics of the D-Cache */
 
-  ccsidr = getreg32(NVIC_CCSIDR);
+  ccsidr = arm_dcache_ccsidr();
   sshift = CCSIDR_LSSHIFT(ccsidr) + 4;   /* log2(cache-line-size-in-bytes) */
   sets   = CCSIDR_SETS(ccsidr);          /* (Number of sets) - 1 */
   ways   = CCSIDR_WAYS(ccsidr);          /* (Number of ways) - 1 */
@@ -624,7 +657,7 @@ void up_clean_dcache_all(void)
 
   /* Get the characteristics of the D-Cache */
 
-  ccsidr = getreg32(NVIC_CCSIDR);
+  ccsidr = arm_dcache_ccsidr();
   sets   = CCSIDR_SETS(ccsidr);          /* (Number of sets) - 1 */
   sshift = CCSIDR_LSSHIFT(ccsidr) + 4;   /* log2(cache-line-size-in-bytes) */
   ways   = CCSIDR_WAYS(ccsidr);          /* (Number of ways) - 1 */
@@ -701,7 +734,7 @@ void up_flush_dcache(uintptr_t start, uintptr_t end)
 
   /* Get the characteristics of the D-Cache */
 
-  ccsidr = getreg32(NVIC_CCSIDR);
+  ccsidr = arm_dcache_ccsidr();
   sshift = CCSIDR_LSSHIFT(ccsidr) + 4;   /* log2(cache-line-size-in-bytes) */
   sets   = CCSIDR_SETS(ccsidr);          /* (Number of sets) - 1 */
   ways   = CCSIDR_WAYS(ccsidr);          /* (Number of ways) - 1 */
@@ -778,7 +811,7 @@ void up_flush_dcache_all(void)
 
   /* Get the characteristics of the D-Cache */
 
-  ccsidr = getreg32(NVIC_CCSIDR);
+  ccsidr = arm_dcache_ccsidr();
   sets   = CCSIDR_SETS(ccsidr);          /* (Number of sets) - 1 */
   sshift = CCSIDR_LSSHIFT(ccsidr) + 4;   /* log2(cache-line-size-in-bytes) */
   ways   = CCSIDR_WAYS(ccsidr);          /* (Number of ways) - 1 */
