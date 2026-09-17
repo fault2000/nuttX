@@ -70,6 +70,9 @@ extern void board_trustram_boot_idle_entry_probe(void);
 #ifdef TRUSTRAM_BOOT_IDLE_LIFECYCLE_PROBE
 #  include <nuttx/trustram_boot_idle.h>
 #endif
+#ifdef TRUSTRAM_BOOT_TASK_PUBLISH_PROBE
+#  include <nuttx/trustram_boot_task_publish.h>
+#endif
 
 #include "sched/sched.h"
 #include "signal/signal.h"
@@ -688,6 +691,18 @@ void nx_start(void)
    */
 
   sched_lock();
+
+#ifdef TRUSTRAM_BOOT_TASK_PUBLISH_PROBE
+  /* This detached endpoint publishes one fixed HPWORK task while the idle
+   * scheduler lock and PRIMASK still prohibit its execution.  It stops before
+   * filesystem/IRQ/hardware initialization, normal work-queue bring-up and
+   * the eventual scheduler unlock.  Continuing ordinary boot here would
+   * create a second worker and exceed the tested publication-only scope.
+   */
+
+  board_trustram_boot_task_publish_entry_probe();
+  board_trustram_boot_task_publish_stop_probe();
+#endif
 
   /* Initialize the file system (needed to support device drivers) */
 

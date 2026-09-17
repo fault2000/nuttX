@@ -353,3 +353,25 @@ int work_start_lowpri(void)
 #endif /* CONFIG_SCHED_LPWORK */
 
 #endif /* CONFIG_SCHED_WORKQUEUE */
+
+#ifdef TRUSTRAM_BOOT_TASK_PUBLISH_PROBE
+#  include <nuttx/trustram_boot_task_publish.h>
+#  include "task/task.h"
+/* Keep the fixed worker recipe beside its actual private implementation.
+ * The detached board producer may publish this task, but it never executes
+ * work_thread or substitutes another entry as a successful worker.
+ */
+
+const struct trustram_boot_hpwork_s g_trustram_boot_hpwork_policy
+__attribute__((section(".rodata.trustram_boot_hpwork_policy"), used)) =
+{
+  2,
+  nxtask_start,
+  work_thread,
+  HPWORKNAME,
+  CONFIG_SCHED_HPWORKPRIORITY,
+  CONFIG_SCHED_HPWORKSTACKSIZE,
+  CONFIG_SCHED_HPNTHREADS,
+  (struct kwork_wqueue_s *)&g_hpwork
+};
+#endif
