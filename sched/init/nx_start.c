@@ -378,6 +378,10 @@ void nx_start(void)
        * that has pid == 0 and sched_priority == 0.
        */
 
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+      up_trustram_idle_tcb_begin(&g_idletcb[i].cmn,
+                                sizeof(struct task_tcb_s));
+#endif
       memset((void *)&g_idletcb[i], 0, sizeof(struct task_tcb_s));
       g_idletcb[i].cmn.pid        = i;
       g_idletcb[i].cmn.task_state = TSTATE_TASK_RUNNING;
@@ -535,7 +539,14 @@ void nx_start(void)
     }
 
   g_pidhash = kmm_zalloc(sizeof(*g_pidhash) * g_npidhash);
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+  if (g_pidhash == NULL)
+    {
+      PANIC();
+    }
+#else
   DEBUGASSERT(g_pidhash);
+#endif
 
   /* IDLE Group Initialization **********************************************/
 
@@ -550,7 +561,14 @@ void nx_start(void)
 
       /* Allocate the IDLE group */
 
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+      if (group_allocate(&g_idletcb[i], g_idletcb[i].cmn.flags) < OK)
+        {
+          PANIC();
+        }
+#else
       DEBUGVERIFY(group_allocate(&g_idletcb[i], g_idletcb[i].cmn.flags));
+#endif
       g_idletcb[i].cmn.group->tg_info->argv = &g_idleargv[i][0];
 
 #ifdef CONFIG_SMP

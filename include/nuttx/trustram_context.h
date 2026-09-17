@@ -161,11 +161,29 @@ struct trustram_initial_state_s
   bool idle;
 };
 
+/* Boot-only idle admission before nx_start's first explicit TCB memset.
+ * begin validates the exact immutable registered static idle object and its
+ * complete native size before dereferencing it, then prepares one pending
+ * boot binding. PID, ordinary fields, pointer/size alone and this call are
+ * not caller authority. The earlier trusted startup .bss clear is distinct
+ * from this first explicit nx_start initialization write.
+ *
+ * initial, TLS carving and idle_complete must consume that same pending
+ * identity; none may establish it later from ordinary TCB state. Replayed,
+ * unknown or malformed admission terminates before any TCB write. Failure
+ * after admission is terminal: reset, not retry or rollback. Caller boot
+ * provenance, protected records, writer exclusion and machine SP/shadow
+ * ancestry remain external obligations, not implemented by this host hook.
+ */
+
+void up_trustram_idle_tcb_begin(struct tcb_s *tcb, size_t native_bytes);
+
 /* initial validates or terminates before the first xcp/stack write. Its
  * approved plan comes from the protected creation or boot binding, never
  * from PID alone or ordinary stack/entry fields. A task plan contains the
  * complete fixed M7 initial frame; idle has no synthetic frame and no stack
- * coloration. idle_complete follows successful TLS setup and admits the
+ * coloration. Idle requires the pending identity already admitted by begin.
+ * idle_complete follows successful TLS setup and admits the
  * already-running boot owner without changing the machine stack pointer.
  */
 
