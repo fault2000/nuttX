@@ -2144,12 +2144,12 @@ static int up_setup(struct uart_dev_s *dev)
 
   /* Configure CR3
    *
-   * Clear CTSE, RTSE, and all interrupt enable bits
+   * Clear CTSE, RTSE, interrupt enables, and the previous Rx FIFO threshold
    */
 
   regval  = up_serialin(priv, STM32_USART_CR3_OFFSET);
   regval &= ~(USART_CR3_CTSIE | USART_CR3_CTSE |
-              USART_CR3_RTSE | USART_CR3_EIE);
+              USART_CR3_RTSE | USART_CR3_EIE | USART_CR3_RXFTCFG_MASK);
 
   /* Set Rx FIFO threshold to the configured level */
 
