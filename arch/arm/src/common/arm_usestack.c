@@ -78,6 +78,7 @@ int up_use_stack(struct tcb_s *tcb, void *stack, size_t stack_size)
 {
 #ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
   struct trustram_stack_layout_s layout;
+  int ttype;
   int ret;
 
   if (tcb == NULL || stack == NULL)
@@ -85,8 +86,14 @@ int up_use_stack(struct tcb_s *tcb, void *stack, size_t stack_size)
       return -EINVAL;
     }
 
+  ttype = up_trustram_tcb_create_type(tcb);
+  if (ttype < OK)
+    {
+      return ttype;
+    }
+
   ret = up_trustram_stack_acquire(tcb, stack, stack_size,
-                                  tcb->flags & TCB_FLAG_TTYPE_MASK, &layout);
+                                  (uint8_t)ttype, &layout);
   if (ret < OK)
     {
       return ret;

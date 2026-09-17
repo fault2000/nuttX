@@ -34,6 +34,10 @@
 #include <nuttx/sched.h>
 #include <nuttx/kthread.h>
 
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+#  include <nuttx/trustram_context.h>
+#endif
+
 #include "sched/sched.h"
 #include "group/group.h"
 #include "task/task.h"
@@ -78,7 +82,11 @@ static int nxthread_create(FAR const char *name, uint8_t ttype,
 
   /* Allocate a TCB for the new task. */
 
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+  tcb = up_trustram_tcb_alloc(sizeof(struct task_tcb_s), ttype);
+#else
   tcb = (FAR struct task_tcb_s *)kmm_zalloc(sizeof(struct task_tcb_s));
+#endif
   if (!tcb)
     {
       serr("ERROR: Failed to allocate TCB\n");
@@ -95,7 +103,11 @@ static int nxthread_create(FAR const char *name, uint8_t ttype,
                     NULL);
   if (ret < OK)
     {
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+      up_trustram_context_free_tcb(&tcb->cmn);
+#else
       kmm_free(tcb);
+#endif
       return ret;
     }
 

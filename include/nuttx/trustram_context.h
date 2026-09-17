@@ -28,7 +28,9 @@
     defined(CONFIG_SCHED_SPORADIC) || defined(CONFIG_TLS_ALIGNED) || \
     defined(CONFIG_MM_KERNEL_HEAP) || defined(CONFIG_ARMV7M_STACKCHECK) || \
     defined(CONFIG_SUPPRESS_INTERRUPTS) || defined(CONFIG_SCHED_STARTHOOK) || \
-    defined(CONFIG_HAVE_CXXINITIALIZE) || defined(CONFIG_ARCH_HIPRI_INTERRUPT)
+    defined(CONFIG_HAVE_CXXINITIALIZE) || defined(CONFIG_ARCH_HIPRI_INTERRUPT) || \
+    defined(CONFIG_MM_SHM) || defined(CONFIG_BINFMT_CONSTRUCTORS) || \
+    (defined(CONFIG_ARCH_HAVE_VFORK) && defined(CONFIG_SCHED_WAITPID))
 #  error "Unsupported TRUST-RAM context-hook rollback profile"
 #endif
 
@@ -37,6 +39,35 @@
 #include <stdint.h>
 
 struct tcb_s;
+
+/* Host-only TCB allocation/first-access boundaries. alloc claims one exact
+ * boot-registered extent and retains its generation/type before the first
+ * zero or write; success returns that complete extent zeroed. NULL denotes
+ * ordinary exhaustion, not permission to fall back to the heap. Only fixed
+ * concrete sizes and types from approved task/kernel/pthread callers are
+ * accepted. No ordinary allocation, flags, PID or caller-supplied pointer can
+ * establish provenance. Protected backing, allocator entry/CFI, serialization
+ * and all-writer exclusion remain required and are not implemented here.
+ *
+ * create_type resolves the exact pointer against that retained claim and
+ * generation in its pre-stack CLAIMED state before any ordinary field read.
+ * It returns the retained TCB type or negative errno without changing state.
+ * The pointer is an identifier, never caller authority. A newly zeroed
+ * pthread TCB need not yet have its ordinary type flag mirror populated.
+ */
+
+void *up_trustram_tcb_alloc(size_t size, uint8_t ttype);
+int up_trustram_tcb_create_type(struct tcb_s *tcb);
+
+/* uninit validates or terminates before the inactive-list operation or any
+ * TCB dereference. It requires the retained BOUND identity, sealed creation
+ * and stack lease, and a RESERVED owner that has never run. Caller provenance
+ * must authorize cancellation; ordinary inactive/PID fields are not proof.
+ * Validation does not consume the binding. Abort/free retain it until every
+ * subsequent cleanup writer has finished; replay/active/unknown is fatal.
+ */
+
+void up_trustram_context_check_uninit(struct tcb_s *tcb);
 
 /* IRQ handoff boundaries for host integration only. enter validates or
  * terminates before ordinary LED/ack/dispatch callbacks. The interrupted
@@ -162,9 +193,10 @@ int up_trustram_stack_carve(struct tcb_s *tcb, size_t requested,
  * TCB release follows the same deferral decision, never an ordinary flag.
  * Legitimate early failures can have no lease. Otherwise the service must
  * validate the bound lease even when the ordinary stack pointer is NULL.
- * Cancelled, never-running creation reclaims its lease before release returns:
- * nxtask_init callers can free the TCB directly after failure. Only retiring
- * execution defers both backing and TCB until handoff/quiescence.
+ * Cancelled, never-running creation can reclaim its lease before release
+ * returns but retains the TCB claim through all remaining cleanup writes.
+ * nxtask_init callers use free_tcb only after that cleanup has finished.
+ * Retiring execution defers both backing and TCB until handoff/quiescence.
  * free_tcb verifies detachment and retains a retiring TCB until reclaim;
  * there is no fallback to freeing from ordinary TCB pointers or flags.
  */

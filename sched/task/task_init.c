@@ -91,12 +91,35 @@ int nxtask_init(FAR struct task_tcb_s *tcb, const char *name, int priority,
                 main_t entry, FAR char * const argv[],
                 FAR char * const envp[])
 {
-  uint8_t ttype = tcb->cmn.flags & TCB_FLAG_TTYPE_MASK;
   int ret;
 #ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+  uint8_t ttype;
   bool stack_acquired = false;
   bool context_prepared = false;
   bool scheduler_published = false;
+
+  /* Resolve an exact retained allocation before any ordinary TCB access,
+   * including taking the address of a member of a possibly NULL pointer.
+   */
+
+  ret = up_trustram_tcb_create_type((FAR struct tcb_s *)tcb);
+  if (ret < OK)
+    {
+      return ret;
+    }
+
+  if (ret != TCB_FLAG_TTYPE_TASK && ret != TCB_FLAG_TTYPE_KERNEL)
+    {
+      return -EINVAL;
+    }
+
+  ttype = (uint8_t)ret;
+  if ((tcb->cmn.flags & TCB_FLAG_TTYPE_MASK) != ttype)
+    {
+      return -EINVAL;
+    }
+#else
+  uint8_t ttype = tcb->cmn.flags & TCB_FLAG_TTYPE_MASK;
 #endif
 
 #ifndef CONFIG_DISABLE_PTHREAD
@@ -263,6 +286,10 @@ errout_with_group:
 
 void nxtask_uninit(FAR struct task_tcb_s *tcb)
 {
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+  up_trustram_context_check_uninit((FAR struct tcb_s *)tcb);
+#endif
+
   /* The TCB was added to the inactive task list by
    * nxtask_setup_scheduler().
    */

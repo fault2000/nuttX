@@ -24,6 +24,10 @@
 
 #include <nuttx/config.h>
 
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+#  include <nuttx/trustram_context.h>
+#endif
+
 #include <sys/types.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -136,7 +140,12 @@ int exec_module(FAR const struct binary_s *binp,
 
   /* Allocate a TCB for the new task. */
 
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+  tcb = (FAR struct task_tcb_s *)
+        up_trustram_tcb_alloc(sizeof(struct task_tcb_s), TCB_FLAG_TTYPE_TASK);
+#else
   tcb = (FAR struct task_tcb_s *)kmm_zalloc(sizeof(struct task_tcb_s));
+#endif
   if (!tcb)
     {
       return -ENOMEM;
@@ -312,7 +321,11 @@ errout_with_envp:
 errout_with_args:
   binfmt_freeargv(argv);
 errout_with_tcb:
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+  up_trustram_context_free_tcb((FAR struct tcb_s *)tcb);
+#else
   kmm_free(tcb);
+#endif
   return ret;
 }
 

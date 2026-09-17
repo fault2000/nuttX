@@ -267,8 +267,13 @@ int nx_pthread_create(pthread_trampoline_t trampoline, FAR pthread_t *thread,
 
   /* Allocate a TCB for the new task. */
 
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+  ptcb = up_trustram_tcb_alloc(sizeof(struct pthread_tcb_s),
+                             TCB_FLAG_TTYPE_PTHREAD);
+#else
   ptcb = (FAR struct pthread_tcb_s *)
             kmm_zalloc(sizeof(struct pthread_tcb_s));
+#endif
   if (!ptcb)
     {
       serr("ERROR: Failed to allocate TCB\n");
