@@ -34,7 +34,8 @@
 #ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
 #  include <nuttx/trustram_context.h>
 #endif
-#ifdef TRUSTRAM_BOOT_IDLE_LIFECYCLE_PROBE
+#if defined(TRUSTRAM_BOOT_IDLE_LIFECYCLE_PROBE) || \
+    defined(TRUSTRAM_BOOT_TASK_CANDIDATE_PROBE)
 #  include <nuttx/trustram_boot_idle.h>
 #endif
 
@@ -62,7 +63,24 @@
 
 void up_initial_state(struct tcb_s *tcb)
 {
-#ifdef TRUSTRAM_BOOT_IDLE_LIFECYCLE_PROBE
+#ifdef TRUSTRAM_BOOT_TASK_CANDIDATE_PROBE
+  struct trustram_boot_native_initial_s plan;
+
+  _Static_assert(XCPTCONTEXT_REGS == 53,
+                 "TRUST-RAM candidate requires the fixed M7 frame");
+  _Static_assert(XCPTCONTEXT_SIZE == 53 * sizeof(uint32_t),
+                 "TRUST-RAM candidate requires the complete M7 frame");
+  board_trustram_boot_native_initial_probe(tcb, &plan);
+  memset(&tcb->xcp, 0, sizeof(struct xcptcontext));
+  tcb->stack_alloc_ptr = plan.stack.allocation;
+  tcb->stack_base_ptr = plan.stack.base;
+  tcb->adj_stack_size = plan.stack.size;
+  if (plan.regs != NULL)
+    {
+      memcpy(plan.regs, plan.words, XCPTCONTEXT_SIZE);
+      tcb->xcp.regs = plan.regs;
+    }
+#elif defined(TRUSTRAM_BOOT_IDLE_LIFECYCLE_PROBE)
   struct trustram_boot_idle_stack_s stack;
 
   board_trustram_boot_idle_initial_probe(tcb, &stack);
