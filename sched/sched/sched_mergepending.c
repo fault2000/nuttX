@@ -36,9 +36,9 @@
 #include "irq/irq.h"
 #include "sched/sched.h"
 
-/****************************************************************************
- * Pre-processor Definitions
- ****************************************************************************/
+#ifdef TRUSTRAM_BOOT_TASK_HANDOFF_PROBE
+#  include <nuttx/trustram_boot_task_publish.h>
+#endif
 
 #define ALL_CPUS ((cpu_set_t)-1)
 
@@ -104,11 +104,11 @@ bool nxsched_merge_pending(void)
         {
         }
 
-      /* Add the ptcb to the spot found in the list.  Check if the
-       * ptcb goes at the ends of the ready-to-run list. This would be
-       * error condition since the idle test must always be at the end of
-       * the ready-to-run list!
-       */
+      /* Idle must remain the final ready task. Fail closed before any
+       * null dereference in the detached first-task path. */
+#ifdef TRUSTRAM_BOOT_TASK_HANDOFF_PROBE
+      if (rtcb == NULL) { board_trustram_boot_fault(); }
+#endif
 
       DEBUGASSERT(rtcb);
 

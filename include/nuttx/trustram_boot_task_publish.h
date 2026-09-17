@@ -62,4 +62,12 @@ void board_trustram_boot_task_publish_entry_probe(void);
 void board_trustram_boot_task_publish_stop_probe(void)
   __attribute__((noreturn));
 
+#ifdef TRUSTRAM_BOOT_TASK_HANDOFF_PROBE
+void board_trustram_boot_fault(void) __attribute__((noreturn));
+void board_trustram_boot_task_handoff_entry_probe(void)
+  __attribute__((noreturn));
+void board_trustram_boot_task_handoff_startup_probe(void)
+  __attribute__((noreturn));
+#endif
+
 #endif /* __INCLUDE_NUTTX_TRUSTRAM_BOOT_TASK_PUBLISH_H */

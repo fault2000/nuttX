@@ -701,7 +701,11 @@ void nx_start(void)
    */
 
   board_trustram_boot_task_publish_entry_probe();
+#ifdef TRUSTRAM_BOOT_TASK_HANDOFF_PROBE
+  board_trustram_boot_task_handoff_entry_probe();
+#else
   board_trustram_boot_task_publish_stop_probe();
+#endif
 #endif
 
   /* Initialize the file system (needed to support device drivers) */

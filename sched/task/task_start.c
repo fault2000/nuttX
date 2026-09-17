@@ -61,21 +61,21 @@
  * Public Functions
  ****************************************************************************/
 
-/****************************************************************************
- * Name: nxtask_start
- *
- * Description:
- *   This function is the low level entry point into the main thread of
- *   execution of a task.  It receives initial control when the task is
- *   started and calls main entry point of the newly started task.
- *
- * Input Parameters:
- *   None
- *
- * Returned Value:
- *   None
- *
- ****************************************************************************/
+/* Native initial task entry. The detached handoff profile stops after
+ * protected dispatch admission, before the actual HPWORK entry executes.
+ */
+#ifdef TRUSTRAM_BOOT_TASK_HANDOFF_PROBE
+#  include <nuttx/trustram_boot_task_publish.h>
+#  if defined(__arm__) && defined(__thumb__)
+__attribute__((naked, noreturn)) void nxtask_start(void)
+{
+  __asm__ volatile ("b.w board_trustram_boot_task_handoff_startup_probe");
+}
+#  else
+void nxtask_start(void) { board_trustram_boot_task_handoff_startup_probe(); }
+#  endif
+#else
+
 
 void nxtask_start(void)
 {
@@ -176,3 +176,5 @@ void nxtask_start(void)
   exit(exitcode);
 #endif /* CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS */
 }
+
+#endif /* TRUSTRAM_BOOT_TASK_HANDOFF_PROBE */
