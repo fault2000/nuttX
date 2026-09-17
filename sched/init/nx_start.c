@@ -52,6 +52,22 @@
 #  include <nuttx/trustram_boot_layout.h>
 #endif
 
+#ifdef TRUSTRAM_BOOT_IDLE_PROBE
+#  if !defined(TRUSTRAM_BOOT_LAYOUT_PROBE) || \
+      !defined(TRUSTRAM_BOOT_ROOT_PROBE) || \
+      !defined(TRUSTRAM_BOOT_ACCESS_PROBE) || \
+      defined(CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS)
+#    error "Detached idle probe requires boot probes and excludes runtime hooks"
+#  endif
+
+/* Fixed no-argument detached board entry; never ordinary caller authority.
+ * Its one pending admission precedes the first explicit idle TCB write.
+ * The earlier startup BSS clear and g_nx_initstate store are distinct.
+ */
+
+extern void board_trustram_boot_idle_entry_probe(void);
+#endif
+
 #include "sched/sched.h"
 #include "signal/signal.h"
 #include "semaphore/semaphore.h"
@@ -408,6 +424,9 @@ void nx_start(void)
 #ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
       up_trustram_idle_tcb_begin(&g_idletcb[i].cmn,
                                 sizeof(struct task_tcb_s));
+#endif
+#ifdef TRUSTRAM_BOOT_IDLE_PROBE
+      board_trustram_boot_idle_entry_probe();
 #endif
       memset((void *)&g_idletcb[i], 0, sizeof(struct task_tcb_s));
       g_idletcb[i].cmn.pid        = i;
