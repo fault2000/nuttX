@@ -32,9 +32,9 @@
 #include "irq/irq.h"
 #include "sched/sched.h"
 
-/****************************************************************************
- * Public Functions
- ****************************************************************************/
+#ifdef TRUSTRAM_BOOT_WORKER_WAIT_PROBE
+#  include <nuttx/trustram_boot_worker_wait.h>
+#endif
 
 /****************************************************************************
  * Name: nxsched_remove_readytorun
@@ -71,11 +71,11 @@ bool nxsched_remove_readytorun(FAR struct tcb_s *rtcb)
 
   if (rtcb->blink == NULL)
     {
-      /* There must always be at least one task in the list (the IDLE task)
-       * after the TCB being removed.
-       */
-
+      /* At least the IDLE task must remain after the removed task. */
       FAR struct tcb_s *nxttcb = (FAR struct tcb_s *)rtcb->flink;
+#ifdef TRUSTRAM_BOOT_WORKER_WAIT_PROBE
+      if (nxttcb == NULL) { board_trustram_boot_fault(); }
+#endif
       DEBUGASSERT(nxttcb != NULL);
 
       nxttcb->task_state = TSTATE_TASK_RUNNING;

@@ -36,9 +36,9 @@
 #include "group/group.h"
 #include "arm_internal.h"
 
-/****************************************************************************
- * Public Functions
- ****************************************************************************/
+#ifdef TRUSTRAM_BOOT_WORKER_WAIT_PROBE
+#  include <nuttx/trustram_boot_worker_wait.h>
+#endif
 
 /****************************************************************************
  * Name: up_block_task
@@ -102,10 +102,10 @@ void up_block_task(struct tcb_s *tcb, tstate_t task_state)
 
       if (CURRENT_REGS)
         {
-          /* Yes, then we have to do things differently.
-           * Just copy the CURRENT_REGS into the OLD rtcb.
-           */
-
+#ifdef TRUSTRAM_BOOT_WORKER_WAIT_PROBE
+          board_trustram_boot_fault();
+#else
+          /* The ordinary IRQ path saves and restores its native frame. */
           arm_savestate(rtcb->xcp.regs);
 
           /* Restore the exception context of the rtcb at the (new) head
@@ -123,8 +123,8 @@ void up_block_task(struct tcb_s *tcb, tstate_t task_state)
            */
 
           arm_restorestate(rtcb->xcp.regs);
+#endif
         }
-
       /* No, then we will need to perform the user context switch */
 
       else

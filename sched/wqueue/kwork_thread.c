@@ -97,12 +97,7 @@ struct lp_wqueue_s g_lpwork =
 #endif /* CONFIG_SCHED_LPWORK */
 
 /****************************************************************************
- * Private Functions
- ****************************************************************************/
-
-/****************************************************************************
  * Name: work_thread
- *
  * Description:
  *   These are the worker threads that perform the actions placed on the
  *   high priority work queue.
@@ -114,15 +109,20 @@ struct lp_wqueue_s g_lpwork =
  *   bring up.  This entry point is referenced by OS internally and should
  *   not be accessed by application logic.
  *
- * Input Parameters:
- *   argc, argv
+ * Detached probe:
+ *   Only the fixed first empty-queue wait may execute. Unexpected return
+ *   ends in the trusted fault path, before any work callback can run.
  *
- * Returned Value:
- *   Does not return
- *
+ * Parameters: argc, argv. Does not return.
  ****************************************************************************/
-
-static int work_thread(int argc, FAR char *argv[])
+#ifdef TRUSTRAM_BOOT_WORKER_WAIT_PROBE
+#  include <nuttx/trustram_boot_worker_wait.h>
+#  define TRUSTRAM_WORKER_SCOPE
+#else
+#  define TRUSTRAM_WORKER_SCOPE static
+#endif
+/* Keep the normal body and its subsequent diagnostic line positions. */
+TRUSTRAM_WORKER_SCOPE int work_thread(int argc, FAR char *argv[])
 {
   FAR struct kwork_wqueue_s *wqueue;
   FAR struct work_s *work;
@@ -146,10 +146,10 @@ static int work_thread(int argc, FAR char *argv[])
 
       nxsem_wait_uninterruptible(&wqueue->sem);
 
-      /* And check each entry in the work queue.  Since we have disabled
-       * interrupts we know:  (1) we will not be suspended unless we do
-       * so ourselves, and (2) there will be no changes to the work queue
-       */
+#ifdef TRUSTRAM_BOOT_WORKER_WAIT_PROBE
+      board_trustram_boot_fault(); /* This profile must block, never run work. */
+#endif
+      /* The ordinary worker processes entries with interrupts disabled. */
 
       /* Remove the ready-to-execute work from the list */
 
