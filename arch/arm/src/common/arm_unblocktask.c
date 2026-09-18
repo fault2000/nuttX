@@ -64,14 +64,13 @@ void up_unblock_task(struct tcb_s *tcb)
   struct tcb_s *rtcb = this_task();
 
 #ifdef CONFIG_ARM_TRUSTRAM_COOPERATIVE_TEST
-  /* The closed diagnostic has no IRQ-side scheduler path. Reject before
-   * changing any queue, including when no context switch would be needed.
-   */
+  /* Admit only the protected early-captured diagnostic IRQ request before
+   * changing any queue, including when no context switch would be needed. */
 
   if (board_trustram_coop_scheduler_active() &&
       (CURRENT_REGS != NULL || getipsr() != 0))
     {
-      board_trustram_boot_fault();
+      board_trustram_coop_scheduler_irq_admit(tcb);
     }
 #endif
 
@@ -105,24 +104,37 @@ void up_unblock_task(struct tcb_s *tcb)
 #ifdef TRUSTRAM_BOOT_WORKER_WAKE_PROBE
           board_trustram_boot_fault();
 #else
-          /* The ordinary IRQ path retains its native frame handling. */
-          arm_savestate(rtcb->xcp.regs);
+#ifdef CONFIG_ARM_TRUSTRAM_COOPERATIVE_TEST
+          if (board_trustram_coop_scheduler_active())
+            {
+              struct tcb_s *nexttcb = this_task();
 
-          /* Restore the exception context of the rtcb at the (new) head
-           * of the ready-to-run task list.
-           */
+              nxsched_resume_scheduler(nexttcb);
+              board_trustram_coop_scheduler_irq_select(&rtcb->xcp.regs,
+                                                       nexttcb->xcp.regs);
+            }
+          else
+#endif
+            {
+              /* The ordinary IRQ path retains its native frame handling. */
+              arm_savestate(rtcb->xcp.regs);
 
-          rtcb = this_task();
+              /* Restore the exception context of the rtcb at the (new) head
+               * of the ready-to-run task list.
+               */
 
-          /* Update scheduler parameters */
+              rtcb = this_task();
 
-          nxsched_resume_scheduler(rtcb);
+              /* Update scheduler parameters */
 
-          /* Then switch contexts.  Any necessary address environment
-           * changes will be made when the interrupt returns.
-           */
+              nxsched_resume_scheduler(rtcb);
 
-          arm_restorestate(rtcb->xcp.regs);
+              /* Then switch contexts.  Any necessary address environment
+               * changes will be made when the interrupt returns.
+               */
+
+              arm_restorestate(rtcb->xcp.regs);
+            }
 #endif
         }
       /* No, then we will need to perform the user context switch */

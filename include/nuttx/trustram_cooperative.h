@@ -32,6 +32,12 @@ extern "C"
 #endif
 
 bool board_trustram_coop_scheduler_active(void);
+struct tcb_s;
+/* IRQ admission precedes all native queue mutation. Selection is a checked
+ * result of native scheduling, never permission to write/read either operand. */
+void board_trustram_coop_scheduler_irq_admit(struct tcb_s *tcb);
+void board_trustram_coop_scheduler_irq_select(uint32_t **save,
+                                             uint32_t *restore);
 void board_trustram_coop_scheduler_switch(uint32_t **save,
                                          uint32_t *restore,
                                          unsigned operation);
