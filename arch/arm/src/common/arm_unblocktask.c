@@ -30,6 +30,10 @@
 #include <nuttx/arch.h>
 #include <nuttx/sched.h>
 
+#ifdef CONFIG_ARM_TRUSTRAM_COOPERATIVE_TEST
+#  include <nuttx/trustram_cooperative.h>
+#endif
+
 #include "sched/sched.h"
 #include "group/group.h"
 #include "clock/clock.h"
@@ -58,6 +62,18 @@
 void up_unblock_task(struct tcb_s *tcb)
 {
   struct tcb_s *rtcb = this_task();
+
+#ifdef CONFIG_ARM_TRUSTRAM_COOPERATIVE_TEST
+  /* The closed diagnostic has no IRQ-side scheduler path. Reject before
+   * changing any queue, including when no context switch would be needed.
+   */
+
+  if (board_trustram_coop_scheduler_active() &&
+      (CURRENT_REGS != NULL || getipsr() != 0))
+    {
+      board_trustram_boot_fault();
+    }
+#endif
 
   /* Verify that the context switch can be performed */
 
@@ -123,7 +139,17 @@ void up_unblock_task(struct tcb_s *tcb)
            * ready to run list.
            */
 
-          arm_switchcontext(&rtcb->xcp.regs, nexttcb->xcp.regs);
+#ifdef CONFIG_ARM_TRUSTRAM_COOPERATIVE_TEST
+          if (board_trustram_coop_scheduler_active())
+            {
+              board_trustram_coop_scheduler_switch(&rtcb->xcp.regs,
+                nexttcb->xcp.regs, TRUSTRAM_COOP_SCHED_UNBLOCK);
+            }
+          else
+#endif
+            {
+              arm_switchcontext(&rtcb->xcp.regs, nexttcb->xcp.regs);
+            }
 
 #if defined(TRUSTRAM_BOOT_WORKER_CYCLE_PROBE) && defined(__arm__)
           __asm__ __volatile__(".global board_trustram_boot_worker_wake_native_return\n"

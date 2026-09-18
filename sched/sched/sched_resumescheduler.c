@@ -30,6 +30,10 @@
 #include <nuttx/clock.h>
 #include <nuttx/sched_note.h>
 
+#ifdef CONFIG_ARM_TRUSTRAM_COOPERATIVE_TEST
+#  include <nuttx/trustram_cooperative.h>
+#endif
+
 #include "irq/irq.h"
 #include "sched/sched.h"
 
@@ -57,6 +61,17 @@
 
 void nxsched_resume_scheduler(FAR struct tcb_s *tcb)
 {
+#ifdef CONFIG_ARM_TRUSTRAM_COOPERATIVE_TEST
+  /* The isolated diagnostic owners are not registered PX4 tasks. Keep
+   * their temporary switches out of normal timing and instrumentation.
+   */
+
+  if (board_trustram_coop_scheduler_active())
+    {
+      return;
+    }
+#endif
+
 #ifdef CONFIG_SCHED_SPORADIC
   if ((tcb->flags & TCB_FLAG_POLICY_MASK) == TCB_FLAG_SCHED_SPORADIC)
     {
