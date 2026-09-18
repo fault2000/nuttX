@@ -13,11 +13,16 @@
 #error "First worker wake requires the detached non-timed native wait subset"
 #endif
 
-/* Only the original worker block boundary returns in this profile. The idle
- * post's unblock boundary retains its native frames and never resumes here. */
+/* The fixed cycle extension alone resumes the posting idle continuation.
+ * Without it, the native unblock boundary remains non-returning. */
 void board_trustram_boot_worker_wake_entry_probe(uint32_t **save,
                                                uint32_t *restore)
+#ifndef TRUSTRAM_BOOT_WORKER_CYCLE_PROBE
   __attribute__((noreturn));
+#else
+  ;
+# include <nuttx/trustram_boot_worker_cycle.h>
+#endif
 
 /* A code landmark immediately after the real block boundary's BL.  The final
  * ARM verifier checks its placement before accepting the protected LR. */
