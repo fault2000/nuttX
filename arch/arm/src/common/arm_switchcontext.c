@@ -41,7 +41,37 @@
  *
  ****************************************************************************/
 
+#ifdef CONFIG_ARM_TRUSTRAM_COOPERATIVE_TEST
+#  if !defined(CONFIG_BUILD_FLAT) || !defined(CONFIG_ARCH_CORTEXM7) || \
+      !defined(CONFIG_ARCH_FPU) || !defined(CONFIG_ARMV7M_USEBASEPRI) || \
+      defined(CONFIG_SMP) || defined(CONFIG_ARCH_HIPRI_INTERRUPT)
+#    error "Cooperative machine diagnostic requires the reviewed Flat M7 FPU ABI"
+#  endif
+_Static_assert(SYS_switch_context == 2, "fixed native cooperative SVC command");
+
+/* A fixed SVC continuation is shared by the normal native return and the
+ * explicitly armed diagnostic vectors. No C prologue may precede it. */
+void arm_switchcontext(uint32_t **saveregs __attribute__((unused)),
+                       uint32_t *restoreregs __attribute__((unused)))
+  __attribute__((naked));
+void arm_switchcontext(uint32_t **saveregs __attribute__((unused)),
+                       uint32_t *restoreregs __attribute__((unused)))
+{
+  __asm__ volatile
+    (
+      "mov r2, r1\n"
+      "mov r1, r0\n"
+      "movs r0, #2\n"
+      "svc #0\n"
+      ".global up_trustram_coop_after_svc\n"
+      ".hidden up_trustram_coop_after_svc\n"
+      "up_trustram_coop_after_svc:\n"
+      "bx lr\n"
+    );
+}
+#else
 void arm_switchcontext(uint32_t **saveregs, uint32_t *restoreregs)
 {
   sys_call2(SYS_switch_context, (uintptr_t)saveregs, (uintptr_t)restoreregs);
 }
+#endif

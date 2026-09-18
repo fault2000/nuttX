@@ -141,6 +141,17 @@
 	.thumb_func
 	.type	exception_common, function
 exception_common:
+#ifdef CONFIG_ARM_TRUSTRAM_COOPERATIVE_TEST
+	/* Only the explicitly installed immutable diagnostic table selects this
+	 * path. Route before the native ordinary-stack save or FP store. */
+	ldr		r0, =0xe000ed08
+	ldr		r0, [r0]
+	ldr		r1, =g_trustram_coop_vectors
+	cmp		r0, r1
+	bne		.Ltrustram_native_exception
+	b.w		board_trustram_coop_handler
+.Ltrustram_native_exception:
+#endif
 
 	mrs		r0, ipsr				/* R0=exception number */
 
