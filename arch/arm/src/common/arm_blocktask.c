@@ -141,11 +141,11 @@ void up_block_task(struct tcb_s *tcb, tstate_t task_state)
 
           arm_switchcontext(&rtcb->xcp.regs, nexttcb->xcp.regs);
 
-          /* arm_switchcontext forces a context switch to the task at the
-           * head of the ready-to-run list.  It does not 'return' in the
-           * normal sense.  When it does return, it is because the blocked
-           * task is again ready to run and has execution priority.
-           */
+#if defined(TRUSTRAM_BOOT_WORKER_WAKE_PROBE) && defined(__arm__)
+          __asm__ __volatile__(".global board_trustram_boot_worker_wait_native_return\n"
+                               ".hidden board_trustram_boot_worker_wait_native_return\n"
+                               "board_trustram_boot_worker_wait_native_return:\n" ::: "memory");
+#endif
         }
     }
 }

@@ -28,10 +28,15 @@ int work_thread(int argc, char *argv[]);
 void board_trustram_boot_fault(void) __attribute__((noreturn));
 
 /* Same argument shape as native arm_switchcontext, but neither pointer grants
- * authority. This boundary verifies the fixed graph and never returns to the
- * worker. General wait/wake or arbitrary task switching is not implemented. */
+ * authority. The optional fixed wake profile alone admits a normal return;
+ * general wait/wake and arbitrary task switching are not implemented. */
 void board_trustram_boot_worker_wait_entry_probe(uint32_t **save,
                                                uint32_t *restore)
+#ifndef TRUSTRAM_BOOT_WORKER_WAKE_PROBE
   __attribute__((noreturn));
+#else
+  ;
+# include <nuttx/trustram_boot_worker_wake.h>
+#endif
 
 #endif /* __INCLUDE_NUTTX_TRUSTRAM_BOOT_WORKER_WAIT_H */

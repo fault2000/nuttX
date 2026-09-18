@@ -139,17 +139,17 @@ TRUSTRAM_WORKER_SCOPE int work_thread(int argc, FAR char *argv[])
 
   for (; ; )
     {
-      /* Then process queued work.  work_process will not return until: (1)
-       * there is no further work in the work queue, and (2) semaphore is
-       * posted.
-       */
-
+#ifdef TRUSTRAM_BOOT_WORKER_WAKE_PROBE
+      board_trustram_boot_worker_wake_complete_probe(
+        nxsem_wait_uninterruptible(&wqueue->sem));
+#else
+      /* First wait until work is posted, then process the ordinary queue. */
       nxsem_wait_uninterruptible(&wqueue->sem);
 
 #ifdef TRUSTRAM_BOOT_WORKER_WAIT_PROBE
       board_trustram_boot_fault(); /* This profile must block, never run work. */
 #endif
-      /* The ordinary worker processes entries with interrupts disabled. */
+#endif
 
       /* Remove the ready-to-execute work from the list */
 

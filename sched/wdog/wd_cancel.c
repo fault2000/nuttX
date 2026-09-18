@@ -35,9 +35,9 @@
 #include "sched/sched.h"
 #include "wdog/wdog.h"
 
-/****************************************************************************
- * Public Functions
- ****************************************************************************/
+#ifdef TRUSTRAM_BOOT_WORKER_WAKE_PROBE
+#  include <nuttx/trustram_boot_worker_wake.h>
+#endif
 
 /****************************************************************************
  * Name: wd_cancel
@@ -68,9 +68,9 @@ int wd_cancel(FAR struct wdog_s *wdog)
 
   flags = enter_critical_section();
 
-  /* Make sure that the watchdog is initialized (non-NULL) and is still
-   * active.
-   */
+#ifdef TRUSTRAM_BOOT_WORKER_WAKE_PROBE
+  if (wdog == NULL || WDOG_ISACTIVE(wdog)) { board_trustram_boot_fault(); }
+#endif
 
   if (wdog != NULL && WDOG_ISACTIVE(wdog))
     {
