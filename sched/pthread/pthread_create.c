@@ -644,7 +644,21 @@ int nx_pthread_create(pthread_trampoline_t trampoline, FAR pthread_t *thread,
   sched_lock();
   if (ret == OK)
     {
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+      ret = nxsem_wait_uninterruptible(&ptcb->cmn.group->tg_joinsem);
+      if (ret < OK)
+        {
+          /* No join-list ownership was acquired. Do not publish the join
+           * record, post the semaphore, or activate the reserved context.
+           */
+
+          errcode = -ret;
+          sched_unlock();
+          goto errout_with_join;
+        }
+#else
       nxsem_wait_uninterruptible(&ptcb->cmn.group->tg_joinsem);
+#endif
       pthread_addjoininfo(ptcb->cmn.group, pjoin);
       pthread_sem_give(&ptcb->cmn.group->tg_joinsem);
 #ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
