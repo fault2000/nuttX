@@ -24,6 +24,10 @@
 
 #include <nuttx/config.h>
 
+#ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
+#  include <nuttx/trustram_observe.h>
+#endif
+
 #include <sys/types.h>
 #include <stdint.h>
 #include <sched.h>
@@ -138,11 +142,18 @@ int nxtask_init(FAR struct task_tcb_s *tcb, const char *name, int priority,
   DEBUGASSERT(tcb && ttype != TCB_FLAG_TTYPE_PTHREAD);
 #endif
 
+#ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
+  tr_observe_begin((uintptr_t)tcb, ttype, (uintptr_t)entry);
+#endif
+
   /* Create a new task group */
 
   ret = group_allocate(tcb, tcb->cmn.flags);
   if (ret < 0)
     {
+#ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
+      tr_observe_note((uintptr_t)tcb, TR_OBS_CREATE_FAILED, ret);
+#endif
       return ret;
     }
 
@@ -231,6 +242,9 @@ int nxtask_init(FAR struct task_tcb_s *tcb, const char *name, int priority,
 #endif
 
   group_initialize(tcb);
+#ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
+  tr_observe_note((uintptr_t)tcb, TR_OBS_INITIALIZED, tcb->cmn.pid);
+#endif
   return ret;
 
 errout_with_group:
@@ -281,6 +295,9 @@ errout_with_group:
 #endif /* CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS */
 
   group_leave(&tcb->cmn);
+#ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
+  tr_observe_note((uintptr_t)tcb, TR_OBS_CREATE_FAILED, ret);
+#endif
   return ret;
 }
 

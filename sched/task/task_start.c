@@ -24,6 +24,10 @@
 
 #include <nuttx/config.h>
 
+#ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
+#  include <nuttx/trustram_observe.h>
+#endif
+
 #include <stdlib.h>
 #include <sched.h>
 #include <assert.h>
@@ -121,6 +125,11 @@ void nxtask_start(void)
 
       nxsig_default_initialize(&tcb->cmn);
     }
+#endif
+
+#ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
+  tr_observe_note((uintptr_t)tcb, TR_OBS_DISPATCH,
+                  (uintptr_t)tcb->cmn.entry.main);
 #endif
 
   /* Execute the start hook if one has been registered */

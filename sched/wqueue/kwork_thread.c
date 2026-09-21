@@ -24,6 +24,10 @@
 
 #include <nuttx/config.h>
 
+#ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
+#  include <nuttx/trustram_observe.h>
+#endif
+
 #ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
 #  include <nuttx/trustram_native_boot.h>
 #endif
@@ -136,6 +140,11 @@ TRUSTRAM_WORKER_SCOPE int work_thread(int argc, FAR char *argv[])
 
   wqueue = (FAR struct kwork_wqueue_s *)
            ((uintptr_t)strtoul(argv[1], NULL, 0));
+
+#ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
+  tr_observe_note((uintptr_t)nxsched_self(), TR_OBS_WORKER_ENTRY,
+                  (uintptr_t)wqueue);
+#endif
 
   flags = enter_critical_section();
 

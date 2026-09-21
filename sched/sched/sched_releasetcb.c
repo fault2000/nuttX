@@ -24,6 +24,10 @@
 
 #include <nuttx/config.h>
 
+#ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
+#  include <nuttx/trustram_observe.h>
+#endif
+
 #include <sys/types.h>
 #include <sched.h>
 #include <errno.h>
@@ -152,6 +156,10 @@ int nxsched_release_tcb(FAR struct tcb_s *tcb, uint8_t ttype)
 
   if (tcb)
     {
+#ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
+      struct tr_observe_token observation =
+        tr_observe_releasing((uintptr_t)tcb);
+#endif
 #ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
       up_trustram_context_release(tcb);
 #endif
@@ -232,6 +240,10 @@ int nxsched_release_tcb(FAR struct tcb_s *tcb, uint8_t ttype)
 #else
       kmm_free(tcb);
 #endif
+#ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
+      tr_observe_released(observation, ret);
+#endif
+
     }
 
   return ret;

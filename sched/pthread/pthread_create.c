@@ -24,6 +24,10 @@
 
 #include <nuttx/config.h>
 
+#ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
+#  include <nuttx/trustram_observe.h>
+#endif
+
 #include <sys/types.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -200,6 +204,10 @@ static void pthread_start(void)
   DEBUGASSERT(ptcb->trampoline != NULL && ptcb->cmn.entry.pthread != NULL);
 
 #ifdef CONFIG_BUILD_FLAT
+#ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
+  tr_observe_note((uintptr_t)ptcb, TR_OBS_DISPATCH,
+                  (uintptr_t)ptcb->cmn.entry.pthread);
+#endif
   ptcb->trampoline(ptcb->cmn.entry.pthread, ptcb->arg);
 #else
   up_pthread_start(ptcb->trampoline, ptcb->cmn.entry.pthread, ptcb->arg);
@@ -279,6 +287,11 @@ int nx_pthread_create(pthread_trampoline_t trampoline, FAR pthread_t *thread,
       serr("ERROR: Failed to allocate TCB\n");
       return ENOMEM;
     }
+
+#ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
+  tr_observe_begin((uintptr_t)ptcb, TCB_FLAG_TTYPE_PTHREAD,
+                   (uintptr_t)entry);
+#endif
 
   /* Bind the parent's group to the new TCB (we have not yet joined the
    * group).
@@ -634,6 +647,9 @@ int nx_pthread_create(pthread_trampoline_t trampoline, FAR pthread_t *thread,
       nxsem_wait_uninterruptible(&ptcb->cmn.group->tg_joinsem);
       pthread_addjoininfo(ptcb->cmn.group, pjoin);
       pthread_sem_give(&ptcb->cmn.group->tg_joinsem);
+#ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
+      tr_observe_note((uintptr_t)ptcb, TR_OBS_INITIALIZED, pid);
+#endif
       nxtask_activate((FAR struct tcb_s *)ptcb);
 
       /* Return the thread information to the caller */
@@ -691,6 +707,9 @@ errout_with_tcb:
       ptcb->cmn.group = NULL;
     }
 
+#ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
+  tr_observe_note((uintptr_t)ptcb, TR_OBS_CREATE_FAILED, errcode);
+#endif
   nxsched_release_tcb((FAR struct tcb_s *)ptcb, TCB_FLAG_TTYPE_PTHREAD);
   return errcode;
 }

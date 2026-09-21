@@ -24,6 +24,10 @@
 
 #include <nuttx/config.h>
 
+#ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
+#  include <nuttx/trustram_observe.h>
+#endif
+
 #include <stdlib.h>
 #include <unistd.h>
 #include <signal.h>
@@ -438,6 +442,12 @@ static inline void nxtask_flushstreams(FAR struct tcb_s *tcb)
 
 void nxtask_exithook(FAR struct tcb_s *tcb, int status, bool nonblocking)
 {
+#ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
+  /* This boundary can also be reached by cancellation/deletion. A test
+   * must additionally show its own entry and return markers. */
+  tr_observe_note((uintptr_t)tcb, TR_OBS_EXIT_HOOK, status);
+#endif
+
   /* Under certain conditions, nxtask_exithook() can be called multiple
    * times.  A bit in the TCB was set the first time this function was
    * called.  If that bit is set, then just exit doing nothing more..

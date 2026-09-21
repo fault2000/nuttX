@@ -24,6 +24,10 @@
 
 #include <nuttx/config.h>
 
+#ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
+#  include <nuttx/trustram_observe.h>
+#endif
+
 #include <sys/types.h>
 #include <sched.h>
 #include <errno.h>
@@ -103,10 +107,17 @@ static int nxthread_create(FAR const char *name, uint8_t ttype,
                     NULL);
   if (ret < OK)
     {
+#ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
+      struct tr_observe_token observation =
+        tr_observe_releasing((uintptr_t)tcb);
+#endif
 #ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
       up_trustram_context_free_tcb(&tcb->cmn);
 #else
       kmm_free(tcb);
+#endif
+#ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
+      tr_observe_released(observation, 0);
 #endif
       return ret;
     }

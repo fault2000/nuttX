@@ -24,6 +24,10 @@
 
 #include <nuttx/config.h>
 
+#ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
+#  include <nuttx/trustram_observe.h>
+#endif
+
 #include <sched.h>
 #include <debug.h>
 
@@ -83,6 +87,10 @@ void nxtask_activate(FAR struct tcb_s *tcb)
    */
 
   sched_note_start(tcb);
+#endif
+
+#ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
+  tr_observe_note((uintptr_t)tcb, TR_OBS_ACTIVATE, tcb->pid);
 #endif
 
   up_unblock_task(tcb);

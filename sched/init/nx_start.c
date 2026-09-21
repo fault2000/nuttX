@@ -44,6 +44,10 @@
 #include <nuttx/drivers/drivers.h>
 #include <nuttx/init.h>
 
+#ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
+#  include <nuttx/trustram_observe.h>
+#endif
+
 #ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
 #  include <nuttx/trustram_native_boot.h>
 #endif
@@ -445,6 +449,10 @@ void nx_start(void)
 #ifdef TRUSTRAM_BOOT_IDLE_PROBE
       board_trustram_boot_idle_entry_probe();
 #endif
+#ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
+      tr_observe_begin((uintptr_t)&g_idletcb[i], TR_OBSERVE_IDLE,
+                       (uintptr_t)nx_start);
+#endif
       memset((void *)&g_idletcb[i], 0, sizeof(struct task_tcb_s));
       g_idletcb[i].cmn.pid        = i;
       g_idletcb[i].cmn.task_state = TSTATE_TASK_RUNNING;
@@ -675,6 +683,10 @@ void nx_start(void)
        */
 
       group_initialize(&g_idletcb[i]);
+#ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
+      tr_observe_note((uintptr_t)&g_idletcb[i], TR_OBS_INITIALIZED, i);
+#endif
+
       g_idletcb[i].cmn.group->tg_flags = GROUP_FLAG_NOCLDWAIT |
                                          GROUP_FLAG_PRIVILEGED;
     }
@@ -876,6 +888,10 @@ void nx_start(void)
   /* The IDLE Loop **********************************************************/
 
   /* When control is return to this point, the system is idle. */
+
+#ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
+  tr_observe_note((uintptr_t)&g_idletcb[0], TR_OBS_IDLE_LOOP, 0);
+#endif
 
   sinfo("CPU0: Beginning Idle Loop\n");
   for (; ; )

@@ -3,6 +3,17 @@
 # see the file kconfig-language.txt in the NuttX tools repository.
 #
 
+config SCHED_TRUSTRAM_OBSERVE
+	bool "Bounded TRUST-RAM native lifecycle observation"
+	default n
+	depends on BUILD_FLAT && ARCH_ARMV7M && ARMV7M_USEBASEPRI
+	depends on !SMP && !ARCH_HIPRI_INTERRUPT
+	depends on !ARM_TRUSTRAM_NATIVE_BOOT && !ARM_TRUSTRAM_COOPERATIVE_TEST
+	---help---
+		Diagnostic ring and native lifecycle markers only. No protection
+		hooks, ownership changes, or native failure on diagnostic loss.
+		The separate v6X trustramobserve label supplies a manual test.
+
 menuconfig DISABLE_OS_API
 	bool "Disable NuttX interfaces"
 	default y
