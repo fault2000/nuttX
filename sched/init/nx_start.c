@@ -44,6 +44,10 @@
 #include <nuttx/drivers/drivers.h>
 #include <nuttx/init.h>
 
+#ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
+#  include <nuttx/trustram_native_boot.h>
+#endif
+
 #ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
 #  include <nuttx/trustram_context.h>
 #endif
@@ -321,6 +325,13 @@ uint8_t g_nx_initstate;  /* See enum nx_initstate_e */
  */
 
 static struct task_tcb_s g_idletcb[CONFIG_SMP_NCPUS];
+
+#ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
+/* Immutable identity for the first native boot transition only. */
+struct tcb_s *const g_trustram_native_boot_idle
+  __attribute__((section(".rodata.trustram_native_boot_idle"), used)) =
+  &g_idletcb[0].cmn;
+#endif
 
 #ifdef TRUSTRAM_BOOT_LAYOUT_PROBE
 #  if !defined(CONFIG_BUILD_FLAT) || defined(CONFIG_SMP) || \
@@ -854,7 +865,13 @@ void nx_start(void)
 
   /* Let other threads have access to the memory manager */
 
+#ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
+  board_trustram_native_boot_prepare();
+#endif
   sched_unlock();
+#ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
+  board_trustram_native_boot_complete();
+#endif
 
   /* The IDLE Loop **********************************************************/
 

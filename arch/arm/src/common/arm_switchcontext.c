@@ -41,7 +41,7 @@
  *
  ****************************************************************************/
 
-#ifdef CONFIG_ARM_TRUSTRAM_COOPERATIVE_TEST
+#if defined(CONFIG_ARM_TRUSTRAM_COOPERATIVE_TEST) || defined(CONFIG_ARM_TRUSTRAM_NATIVE_BOOT)
 #  if !defined(CONFIG_BUILD_FLAT) || !defined(CONFIG_ARCH_CORTEXM7) || \
       !defined(CONFIG_ARCH_FPU) || !defined(CONFIG_ARMV7M_USEBASEPRI) || \
       defined(CONFIG_SMP) || defined(CONFIG_ARCH_HIPRI_INTERRUPT)
@@ -63,9 +63,15 @@ void arm_switchcontext(uint32_t **saveregs __attribute__((unused)),
       "mov r1, r0\n"
       "movs r0, #2\n"
       "svc #0\n"
+#ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
+      ".global up_trustram_native_after_svc\n"
+      ".hidden up_trustram_native_after_svc\n"
+      "up_trustram_native_after_svc:\n"
+#else
       ".global up_trustram_coop_after_svc\n"
       ".hidden up_trustram_coop_after_svc\n"
       "up_trustram_coop_after_svc:\n"
+#endif
       "bx lr\n"
     );
 }

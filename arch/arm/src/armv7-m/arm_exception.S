@@ -141,6 +141,15 @@
 	.thumb_func
 	.type	exception_common, function
 exception_common:
+#ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
+	/* One trusted-boot transition, before native software stacking. */
+	ldr r0, =g_trustram_native_boot_route
+	ldr r0, [r0]
+	cmp r0, #0
+	beq .Ltrustram_boot_native_exception
+	b.w board_trustram_native_boot_handler
+.Ltrustram_boot_native_exception:
+#endif
 #ifdef CONFIG_ARM_TRUSTRAM_COOPERATIVE_TEST
 	/* Only the explicitly installed immutable diagnostic table selects this
 	 * path. Route before the native ordinary-stack save or FP store. */

@@ -107,6 +107,12 @@ void up_release_pending(void)
            */
 
           arm_switchcontext(&rtcb->xcp.regs, nexttcb->xcp.regs);
+#ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
+          __asm__ __volatile__(".global up_trustram_native_boot_after_switch\n"
+                               ".hidden up_trustram_native_boot_after_switch\n"
+                               "up_trustram_native_boot_after_switch:\n"
+                               ::: "memory");
+#endif
 
           /* arm_switchcontext forces a context switch to the task at the
            * head of the ready-to-run list.  It does not 'return' in the

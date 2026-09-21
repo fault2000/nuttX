@@ -1321,4 +1321,17 @@ config ARM_TRUSTRAM_COOPERATIVE_TEST
 	  is an opt-in hardware test, not whole-system context protection. Ordinary
 	  vectors retain the normal NuttX exception and scheduler path.
 
+config ARM_TRUSTRAM_NATIVE_BOOT
+	bool "TRUST-RAM first native boot context handoff"
+	default n
+	depends on BUILD_FLAT && ARCH_CORTEXM7 && ARCH_FPU && ARMV7M_USEBASEPRI
+	depends on ARM_MPU && !SMP && !ARCH_HIPRI_INTERRUPT
+	depends on !ARM_TRUSTRAM_COOPERATIVE_TEST && !SUPPRESS_INTERRUPTS
+	help
+	  Seal the first pending task at the final boot scheduler release and
+	  route its native SVC before software stacking to the board's protected
+	  capture/restore service. The board must provide the complete service.
+	  This covers one trusted-boot handoff, not later task/IRQ protection.
+	  It does not enable the host-only ARCH_TRUSTRAM_CONTEXT_HOOKS interface.
+
 endif # ARCH_ARM
