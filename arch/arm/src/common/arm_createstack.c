@@ -24,6 +24,10 @@
 
 #include <nuttx/config.h>
 
+#ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
+#  include <nuttx/trustram_native_boot.h>
+#endif
+
 #include <sys/types.h>
 #include <stdint.h>
 #include <string.h>
@@ -87,6 +91,13 @@
 
 int up_create_stack(struct tcb_s *tcb, size_t stack_size, uint8_t ttype)
 {
+#ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
+  if (TRUSTRAM_NATIVE_TASK(tcb))
+    {
+      /* This task only accepts its fixed supplied stack during creation. */
+      board_trustram_boot_fault();
+    }
+#endif
 #ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
   struct trustram_stack_layout_s layout;
   int ret;

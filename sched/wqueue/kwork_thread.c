@@ -24,6 +24,10 @@
 
 #include <nuttx/config.h>
 
+#ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
+#  include <nuttx/trustram_native_boot.h>
+#endif
+
 #include <unistd.h>
 #include <sched.h>
 #include <stdio.h>
@@ -317,10 +321,15 @@ int work_start_highpri(void)
 
   sinfo("Starting high-priority kernel worker thread(s)\n");
 
+#ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
+  board_trustram_native_boot_create();
+  return OK;
+#else
   return work_thread_create(HPWORKNAME, CONFIG_SCHED_HPWORKPRIORITY,
                             CONFIG_SCHED_HPWORKSTACKSIZE,
                             CONFIG_SCHED_HPNTHREADS,
                             (FAR struct kwork_wqueue_s *)&g_hpwork);
+#endif
 }
 #endif /* CONFIG_SCHED_HPWORK */
 
@@ -353,6 +362,19 @@ int work_start_lowpri(void)
 #endif /* CONFIG_SCHED_LPWORK */
 
 #endif /* CONFIG_SCHED_WORKQUEUE */
+
+#ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
+#  include "task/task.h"
+/* The concrete private worker and queue are bound in Flash, not selected
+ * by a mutable task name or a caller-provided entry pointer. */
+const struct trustram_native_hpwork_s g_trustram_native_hpwork
+__attribute__((section(".rodata.trustram_native_hpwork"), used)) =
+{
+  nxtask_start, work_thread, HPWORKNAME,
+  CONFIG_SCHED_HPWORKPRIORITY, CONFIG_SCHED_HPWORKSTACKSIZE,
+  CONFIG_SCHED_HPNTHREADS, (struct kwork_wqueue_s *)&g_hpwork
+};
+#endif
 
 #ifdef TRUSTRAM_BOOT_TASK_PUBLISH_PROBE
 #  include <nuttx/trustram_boot_task_publish.h>

@@ -24,6 +24,10 @@
 
 #include <nuttx/config.h>
 
+#ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
+#  include <nuttx/trustram_native_boot.h>
+#endif
+
 #include <sys/types.h>
 #include <stdint.h>
 #include <string.h>
@@ -63,6 +67,14 @@
 
 void up_initial_state(struct tcb_s *tcb)
 {
+#ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
+  if (TRUSTRAM_NATIVE_TASK(tcb))
+    {
+      board_trustram_native_initial_state(tcb);
+      return;
+    }
+#endif
+
 #ifdef TRUSTRAM_BOOT_TASK_CANDIDATE_PROBE
   struct trustram_boot_native_initial_s plan;
 

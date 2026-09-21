@@ -24,6 +24,10 @@
 
 #include <nuttx/config.h>
 
+#ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
+#  include <nuttx/trustram_native_boot.h>
+#endif
+
 #include <sched.h>
 #include <debug.h>
 
@@ -73,6 +77,13 @@
 
 void up_release_stack(struct tcb_s *dtcb, uint8_t ttype)
 {
+#ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
+  if (TRUSTRAM_NATIVE_TASK(dtcb))
+    {
+      board_trustram_boot_fault();
+    }
+#endif
+
 #ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
   (void)ttype;
   up_trustram_stack_release(dtcb);

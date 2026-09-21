@@ -31,6 +31,11 @@
 #include <nuttx/arch.h>
 #include <nuttx/sched.h>
 
+#ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
+#  include <nuttx/trustram_native_boot.h>
+#  include <assert.h>
+#endif
+
 #ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
 #  include <assert.h>
 #  include <nuttx/irq.h>
@@ -79,7 +84,8 @@ static void nxsched_releasepid(pid_t pid)
  * Public Functions
  ****************************************************************************/
 
-#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+#if defined(CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS) || \
+    defined(CONFIG_ARM_TRUSTRAM_NATIVE_BOOT)
 /****************************************************************************
  * Name: nxsched_rollback_inactive
  *
@@ -87,7 +93,7 @@ static void nxsched_releasepid(pid_t pid)
  *   Undo scheduler setup for a never-activated creation transaction.
  *   The PID/inactive entry exists, but activation has not occurred. This
  *   deliberately does not free the caller-owned TCB, stack, group or owner
- *   reservation. The host-only profile rejects configurations with parent,
+ *   reservation. Both the host-only and native boot profiles reject parent,
  *   D-space, CPU-load, or other additional rollback obligations.
  ****************************************************************************/
 
@@ -135,6 +141,14 @@ void nxsched_rollback_inactive(FAR struct tcb_s *tcb)
 int nxsched_release_tcb(FAR struct tcb_s *tcb, uint8_t ttype)
 {
   int ret = OK;
+
+#ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
+  if (TRUSTRAM_NATIVE_TASK(tcb))
+    {
+      /* Permanent backing: runtime HPWORK teardown is not implemented. */
+      board_trustram_boot_fault();
+    }
+#endif
 
   if (tcb)
     {

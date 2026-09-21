@@ -34,6 +34,10 @@
 #include <nuttx/arch.h>
 #include <nuttx/sched.h>
 
+#ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
+#  include <nuttx/trustram_native_boot.h>
+#endif
+
 #ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
 #  include <nuttx/trustram_context.h>
 #endif
@@ -92,6 +96,12 @@ int nxtask_init(FAR struct task_tcb_s *tcb, const char *name, int priority,
                 FAR char * const envp[])
 {
   int ret;
+#ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
+  if (TRUSTRAM_NATIVE_TASK((struct tcb_s *)tcb))
+    {
+      board_trustram_native_check_create((struct tcb_s *)tcb);
+    }
+#endif
 #ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
   uint8_t ttype;
   bool stack_acquired = false;
@@ -224,6 +234,15 @@ int nxtask_init(FAR struct task_tcb_s *tcb, const char *name, int priority,
   return ret;
 
 errout_with_group:
+#ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
+  if (TRUSTRAM_NATIVE_TASK(&tcb->cmn) &&
+      tcb->cmn.task_state == TSTATE_TASK_INACTIVE)
+    {
+      /* Never activated; remove native references before group cleanup and
+       * protected cancellation. The fixed supplied stack is not freed. */
+      nxsched_rollback_inactive(&tcb->cmn);
+    }
+#endif
 #ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
   if (scheduler_published)
     {
@@ -286,6 +305,12 @@ errout_with_group:
 
 void nxtask_uninit(FAR struct task_tcb_s *tcb)
 {
+#ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
+  if (TRUSTRAM_NATIVE_TASK((struct tcb_s *)tcb))
+    {
+      board_trustram_boot_fault();
+    }
+#endif
 #ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
   up_trustram_context_check_uninit((FAR struct tcb_s *)tcb);
 #endif

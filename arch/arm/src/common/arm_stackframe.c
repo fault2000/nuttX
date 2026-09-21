@@ -24,6 +24,10 @@
 
 #include <nuttx/config.h>
 
+#ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
+#  include <nuttx/trustram_native_boot.h>
+#endif
+
 #include <sys/types.h>
 #include <stdint.h>
 #include <sched.h>
@@ -79,6 +83,13 @@
 
 void *up_stack_frame(struct tcb_s *tcb, size_t frame_size)
 {
+#ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
+  if (TRUSTRAM_NATIVE_TASK(tcb))
+    {
+      return board_trustram_native_stack_frame(tcb, frame_size);
+    }
+#endif
+
 #ifdef TRUSTRAM_BOOT_IDLE_LIFECYCLE_PROBE
   struct trustram_boot_idle_frame_s frame;
 

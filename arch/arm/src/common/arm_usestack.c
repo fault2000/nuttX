@@ -24,6 +24,10 @@
 
 #include <nuttx/config.h>
 
+#ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
+#  include <nuttx/trustram_native_boot.h>
+#endif
+
 #include <sys/types.h>
 #include <stdint.h>
 #include <string.h>
@@ -76,6 +80,13 @@
 
 int up_use_stack(struct tcb_s *tcb, void *stack, size_t stack_size)
 {
+#ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
+  if (TRUSTRAM_NATIVE_TASK(tcb))
+    {
+      return board_trustram_native_use_stack(tcb, stack, stack_size);
+    }
+#endif
+
 #ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
   struct trustram_stack_layout_s layout;
   int ttype;
