@@ -68,6 +68,13 @@
 /* Native initial task entry. The detached handoff profile stops after
  * protected dispatch admission, before the actual HPWORK entry executes.
  */
+#if defined(TRUSTRAM_EXIT_FIRST_PROBE)
+#  include <nuttx/trustram_exit_boot.h>
+__attribute__((naked, noreturn)) void nxtask_start(void)
+{
+  __asm__ volatile ("b.w board_trustram_exit_first_startup");
+}
+#else
 #ifdef TRUSTRAM_BOOT_TASK_HANDOFF_PROBE
 #  include <nuttx/trustram_boot_task_publish.h>
 #  if defined(__arm__) && defined(__thumb__)
@@ -187,3 +194,4 @@ void nxtask_start(void)
 }
 
 #endif /* TRUSTRAM_BOOT_TASK_HANDOFF_PROBE */
+#endif /* TRUSTRAM_EXIT_FIRST_PROBE */

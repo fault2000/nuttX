@@ -15,4 +15,10 @@
  * DMA, heap or native task initialization. Does not return to normal boot. */
 void board_trustram_exit_boot_prepare(void);
 __attribute__((noreturn)) void board_trustram_exit_boot_entry(void);
+#ifdef TRUSTRAM_EXIT_FIRST_PROBE
+# if defined(TRUSTRAM_BOOT_TASK_HANDOFF_PROBE) || !defined(__arm__) || !defined(__thumb__)
+#  error "Exit first entry requires its exclusive ARM boot profile"
+# endif
+__attribute__((noreturn)) void board_trustram_exit_first_startup(void);
+#endif
 #endif
