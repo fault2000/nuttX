@@ -81,6 +81,9 @@ extern void board_trustram_boot_idle_entry_probe(void);
 #ifdef TRUSTRAM_BOOT_TASK_PUBLISH_PROBE
 #  include <nuttx/trustram_boot_task_publish.h>
 #endif
+#ifdef TRUSTRAM_EXIT_BOOT_PROBE
+#  include <nuttx/trustram_exit_boot.h>
+#endif
 
 #include "sched/sched.h"
 #include "signal/signal.h"
@@ -330,6 +333,13 @@ uint8_t g_nx_initstate;  /* See enum nx_initstate_e */
 
 static struct task_tcb_s g_idletcb[CONFIG_SMP_NCPUS];
 
+#ifdef TRUSTRAM_EXIT_BOOT_PROBE
+/* Actual idle identity; no substitute TCB or scheduler globals. */
+struct tcb_s *const g_trustram_exit_init_idle
+  __attribute__((section(".rodata.trustram_exit_init_idle"), used)) =
+  &g_idletcb[0].cmn;
+#endif
+
 #ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
 /* Immutable identity for the first native boot transition only. */
 struct tcb_s *const g_trustram_native_boot_idle
@@ -542,6 +552,11 @@ void nx_start(void)
   /* Task lists are initialized */
 
   g_nx_initstate = OSINIT_TASKLISTS;
+
+#ifdef TRUSTRAM_EXIT_BOOT_PROBE
+  /* Native idle/queues exist; no heap, group or other task exists yet. */
+  board_trustram_exit_boot_entry();
+#endif
 
   /* Initialize RTOS facilities *********************************************/
 

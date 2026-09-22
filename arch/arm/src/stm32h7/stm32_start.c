@@ -42,6 +42,10 @@
 #include "stm32_lowputc.h"
 #include "stm32_start.h"
 
+#ifdef TRUSTRAM_EXIT_BOOT_PROBE
+#  include <nuttx/trustram_exit_boot.h>
+#endif
+
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
@@ -176,6 +180,14 @@ void __start(void)
   const uint32_t *src;
   uint32_t *dest;
 
+#ifdef TRUSTRAM_EXIT_BOOT_PROBE
+  /* Explicit reset experiment: no normal board/peripheral bring-up. */
+  __asm__ volatile("cpsid i" : : : "memory");
+  putreg32((uintptr_t)_vectors, NVIC_VECTAB);
+  ARM_DSB();
+  ARM_ISB();
+#endif
+
 #ifdef CONFIG_ARMV7M_STACKCHECK
   /* Set the stack limit before we attempt to call any functions */
 
@@ -222,6 +234,12 @@ void __start(void)
 #endif
 
   /* Configure the UART so that we can get debug output as soon as possible */
+
+#ifdef TRUSTRAM_EXIT_BOOT_PROBE
+  stm32_tcmenable();
+  board_trustram_exit_boot_prepare();
+  nx_start();
+#endif
 
   stm32_clockconfig();
   arm_fpuconfig();
