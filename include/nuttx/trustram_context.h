@@ -88,6 +88,19 @@ void up_trustram_context_check_uninit(struct tcb_s *tcb);
  * assembly capture/restore, caller CFI and all-writer protection are absent.
  */
 
+/* Self-exit host integration. begin retains the active lifetime before any
+ * teardown; handoff follows native cleanup and next scheduler bookkeeping.
+ * Both pointers are compared against protected retained tickets. Never read
+ * incoming->xcp.regs as authority or reacquire a generation from these pointers.
+ * The handoff is nonreturning and has no ordinary restore fallback. Actual
+ * stack departure, protected restoration and external writer closure remain
+ * the adapter's duty; the ARM compile rejection above remains in force.
+ */
+
+void up_trustram_exit_begin(struct tcb_s *outgoing);
+void up_trustram_exit_handoff(struct tcb_s *outgoing, struct tcb_s *incoming)
+  __attribute__((noreturn));
+
 void up_trustram_irq_enter(int irq, uint32_t *regs);
 uint32_t *up_trustram_irq_return(int irq, uint32_t *candidate);
 

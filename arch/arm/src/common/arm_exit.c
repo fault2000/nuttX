@@ -29,6 +29,7 @@
 
 #include <nuttx/arch.h>
 #include <nuttx/irq.h>
+#include <nuttx/trustram_context.h>
 #ifdef CONFIG_DUMP_ON_EXIT
 #  include <nuttx/fs/fs.h>
 #endif
@@ -113,6 +114,13 @@ void up_exit(int status)
 
   enter_critical_section();
 
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+  /* Retain the outgoing lifetime before native teardown changes this_task. */
+
+  struct tcb_s *exiting = tcb;
+  up_trustram_exit_begin(exiting);
+#endif
+
   sinfo("TCB=%p exiting\n", tcb);
 
   /* Destroy the task at the head of the ready to run list. */
@@ -138,5 +146,11 @@ void up_exit(int status)
 
   /* Then switch contexts */
 
+#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+  /* No next-TCB frame read and no native fallback after this boundary. */
+
+  up_trustram_exit_handoff(exiting, tcb);
+#else
   arm_fullcontextrestore(tcb->xcp.regs);
+#endif
 }
