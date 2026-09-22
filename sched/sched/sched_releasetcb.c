@@ -89,7 +89,8 @@ static void nxsched_releasepid(pid_t pid)
  ****************************************************************************/
 
 #if defined(CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS) || \
-    defined(CONFIG_ARM_TRUSTRAM_NATIVE_BOOT)
+    defined(CONFIG_ARM_TRUSTRAM_NATIVE_BOOT) || \
+    defined(TRUSTRAM_BOOT_TASK_PUBLISH_PROBE)
 /****************************************************************************
  * Name: nxsched_rollback_inactive
  *
@@ -97,8 +98,10 @@ static void nxsched_releasepid(pid_t pid)
  *   Undo scheduler setup for a never-activated creation transaction.
  *   The PID/inactive entry exists, but activation has not occurred. This
  *   deliberately does not free the caller-owned TCB, stack, group or owner
- *   reservation. Both the host-only and native boot profiles reject parent,
- *   D-space, CPU-load, or other additional rollback obligations.
+ *   reservation. The host-only, native boot, and detached publication
+ *   profiles reject parent, D-space, CPU-load, or additional rollback
+ *   obligations. Detached publication supplies its own masked critical
+ *   section and terminal failure imports.
  ****************************************************************************/
 
 void nxsched_rollback_inactive(FAR struct tcb_s *tcb)

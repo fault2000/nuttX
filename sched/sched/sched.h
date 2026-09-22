@@ -372,7 +372,8 @@ void nxsched_continue(FAR struct tcb_s *tcb);
 #endif
 
 #if defined(CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS) || \
-    defined(CONFIG_ARM_TRUSTRAM_NATIVE_BOOT)
+    defined(CONFIG_ARM_TRUSTRAM_NATIVE_BOOT) || \
+    defined(TRUSTRAM_BOOT_TASK_PUBLISH_PROBE)
 /* Creation failed after scheduler setup, before any activation. */
 
 void nxsched_rollback_inactive(FAR struct tcb_s *tcb);
