@@ -39,6 +39,9 @@
 #endif
 
 #include "arm_internal.h"
+#ifdef TRUSTRAM_EXIT_CLEANUP_PROBE
+# include <nuttx/trustram_exit_cleanup.h>
+#endif
 
 /****************************************************************************
  * Public Functions
@@ -84,7 +87,9 @@ void up_release_stack(struct tcb_s *dtcb, uint8_t ttype)
     }
 #endif
 
-#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+#if defined(TRUSTRAM_EXIT_CLEANUP_PROBE)
+  board_trustram_exit_cleanup_stack(dtcb, ttype);
+#elif defined(CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS)
   (void)ttype;
   up_trustram_stack_release(dtcb);
 #else

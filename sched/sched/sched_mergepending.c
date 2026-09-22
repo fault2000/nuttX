@@ -38,6 +38,8 @@
 
 #ifdef TRUSTRAM_BOOT_TASK_HANDOFF_PROBE
 #  include <nuttx/trustram_boot_task_publish.h>
+#elif defined(TRUSTRAM_EXIT_CLEANUP_PROBE)
+#  include <nuttx/trustram_exit_cleanup.h>
 #endif
 
 #define ALL_CPUS ((cpu_set_t)-1)
@@ -106,7 +108,7 @@ bool nxsched_merge_pending(void)
 
       /* Idle must remain the final ready task. Fail closed before any
        * null dereference in the detached first-task path. */
-#ifdef TRUSTRAM_BOOT_TASK_HANDOFF_PROBE
+#if defined(TRUSTRAM_BOOT_TASK_HANDOFF_PROBE) || defined(TRUSTRAM_EXIT_CLEANUP_PROBE)
       if (rtcb == NULL) { board_trustram_boot_fault(); }
 #endif
 

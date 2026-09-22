@@ -32,6 +32,9 @@
 #include <nuttx/trustram_context.h>
 #ifdef TRUSTRAM_EXIT_SOURCE_PROBE
 #  include <nuttx/trustram_exit_source.h>
+#  ifdef TRUSTRAM_EXIT_CLEANUP_PROBE
+#    include <nuttx/trustram_exit_cleanup.h>
+#  endif
 #endif
 #ifdef CONFIG_DUMP_ON_EXIT
 #  include <nuttx/fs/fs.h>
@@ -112,12 +115,21 @@ void up_exit(int status)
   struct tcb_s *tcb = this_task();
 
 #ifdef TRUSTRAM_EXIT_SOURCE_PROBE
-  /* Exclusive boot probe: admit native exit, then stop before its first
-   * cleanup writer. General teardown and backing reclamation stay disabled.
+  /* Exclusive boot probe: admit native exit. The cleanup extension runs
+   * bounded native teardown and retained-target restore; otherwise stop
+   * before the first writer. Backing reclamation stays disabled.
    */
 
   board_trustram_exit_source_exit_begin(tcb, status);
+#ifdef TRUSTRAM_EXIT_CLEANUP_PROBE
+  board_trustram_exit_cleanup_begin(tcb);
+  int ret = nxtask_exit();
+  struct tcb_s *next = this_task();
+  board_trustram_exit_cleanup_finish(tcb, next, ret);
+  board_trustram_exit_native_handoff(tcb, next);
+#else
   board_trustram_exit_source_stop();
+#endif
 #else
 
   /* Make sure that we are in a critical section with local interrupts.

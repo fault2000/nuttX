@@ -49,6 +49,9 @@
 #include "sched/sched.h"
 #include "group/group.h"
 #include "timer/timer.h"
+#ifdef TRUSTRAM_EXIT_CLEANUP_PROBE
+# include <nuttx/trustram_exit_cleanup.h>
+#endif
 
 /****************************************************************************
  * Private Functions
@@ -163,7 +166,9 @@ int nxsched_release_tcb(FAR struct tcb_s *tcb, uint8_t ttype)
       struct tr_observe_token observation =
         tr_observe_releasing((uintptr_t)tcb);
 #endif
-#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+#if defined(TRUSTRAM_EXIT_CLEANUP_PROBE)
+      board_trustram_exit_cleanup_release(tcb);
+#elif defined(CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS)
       up_trustram_context_release(tcb);
 #endif
 
@@ -195,7 +200,7 @@ int nxsched_release_tcb(FAR struct tcb_s *tcb, uint8_t ttype)
 
       /* Delete the thread's stack if one has been allocated */
 
-#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+#if defined(CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS) || defined(TRUSTRAM_EXIT_CLEANUP_PROBE)
       up_release_stack(tcb, ttype);
 #else
       if (tcb->stack_alloc_ptr)
@@ -238,7 +243,9 @@ int nxsched_release_tcb(FAR struct tcb_s *tcb, uint8_t ttype)
 
       /* And, finally, release the TCB itself */
 
-#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+#if defined(TRUSTRAM_EXIT_CLEANUP_PROBE)
+      board_trustram_exit_cleanup_complete_tcb(tcb);
+#elif defined(CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS)
       up_trustram_context_free_tcb(tcb);
 #else
       kmm_free(tcb);

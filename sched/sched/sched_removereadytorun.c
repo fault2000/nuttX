@@ -34,6 +34,8 @@
 
 #ifdef TRUSTRAM_BOOT_WORKER_WAIT_PROBE
 #  include <nuttx/trustram_boot_worker_wait.h>
+#elif defined(TRUSTRAM_EXIT_CLEANUP_PROBE)
+#  include <nuttx/trustram_exit_cleanup.h>
 #endif
 
 /****************************************************************************
@@ -73,7 +75,7 @@ bool nxsched_remove_readytorun(FAR struct tcb_s *rtcb)
     {
       /* At least the IDLE task must remain after the removed task. */
       FAR struct tcb_s *nxttcb = (FAR struct tcb_s *)rtcb->flink;
-#ifdef TRUSTRAM_BOOT_WORKER_WAIT_PROBE
+#if defined(TRUSTRAM_BOOT_WORKER_WAIT_PROBE) || defined(TRUSTRAM_EXIT_CLEANUP_PROBE)
       if (nxttcb == NULL) { board_trustram_boot_fault(); }
 #endif
       DEBUGASSERT(nxttcb != NULL);
