@@ -30,6 +30,9 @@
 #include <nuttx/arch.h>
 #include <nuttx/irq.h>
 #include <nuttx/trustram_context.h>
+#ifdef TRUSTRAM_EXIT_SOURCE_PROBE
+#  include <nuttx/trustram_exit_source.h>
+#endif
 #ifdef CONFIG_DUMP_ON_EXIT
 #  include <nuttx/fs/fs.h>
 #endif
@@ -108,6 +111,15 @@ void up_exit(int status)
 {
   struct tcb_s *tcb = this_task();
 
+#ifdef TRUSTRAM_EXIT_SOURCE_PROBE
+  /* Exclusive boot probe: admit native exit, then stop before its first
+   * cleanup writer. General teardown and backing reclamation stay disabled.
+   */
+
+  board_trustram_exit_source_exit_begin(tcb, status);
+  board_trustram_exit_source_stop();
+#else
+
   /* Make sure that we are in a critical section with local interrupts.
    * The IRQ state will be restored when the next task is started.
    */
@@ -153,4 +165,5 @@ void up_exit(int status)
 #else
   arm_fullcontextrestore(tcb->xcp.regs);
 #endif
+#endif /* TRUSTRAM_EXIT_SOURCE_PROBE */
 }

@@ -72,7 +72,11 @@
 #  include <nuttx/trustram_exit_boot.h>
 __attribute__((naked, noreturn)) void nxtask_start(void)
 {
+#ifdef TRUSTRAM_EXIT_SOURCE_PROBE
+  __asm__ volatile ("b.w board_trustram_exit_pair_startup");
+#else
   __asm__ volatile ("b.w board_trustram_exit_first_startup");
+#endif
 }
 #else
 #ifdef TRUSTRAM_BOOT_TASK_HANDOFF_PROBE
