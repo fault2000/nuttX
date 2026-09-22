@@ -24,6 +24,10 @@
 
 #include <nuttx/config.h>
 
+#ifdef TRUSTRAM_EXIT_NATIVE_INIT_PROBE
+#  include <nuttx/trustram_exit_init.h>
+#endif
+
 #ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
 #  include <nuttx/trustram_observe.h>
 #endif
@@ -63,6 +67,10 @@
 
 void nxtask_activate(FAR struct tcb_s *tcb)
 {
+#ifdef TRUSTRAM_EXIT_NATIVE_INIT_PROBE
+  board_trustram_exit_init_activate(tcb);
+#endif
+
   irqstate_t flags = enter_critical_section();
 
 #ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS

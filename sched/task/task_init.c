@@ -24,6 +24,10 @@
 
 #include <nuttx/config.h>
 
+#ifdef TRUSTRAM_EXIT_NATIVE_INIT_PROBE
+#  include <nuttx/trustram_exit_init.h>
+#endif
+
 #ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
 #  include <nuttx/trustram_observe.h>
 #endif
@@ -100,6 +104,9 @@ int nxtask_init(FAR struct task_tcb_s *tcb, const char *name, int priority,
                 FAR char * const envp[])
 {
   int ret;
+#ifdef TRUSTRAM_EXIT_NATIVE_INIT_PROBE
+  board_trustram_exit_init_check((struct tcb_s *)tcb);
+#endif
 #ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
   if (TRUSTRAM_NATIVE_TASK((struct tcb_s *)tcb))
     {
@@ -204,6 +211,14 @@ int nxtask_init(FAR struct task_tcb_s *tcb, const char *name, int priority,
   context_prepared = true;
 #endif
 
+#ifdef TRUSTRAM_EXIT_NATIVE_INIT_PROBE
+  ret = board_trustram_exit_init_prepare(&tcb->cmn);
+  if (ret < OK)
+    {
+      goto errout_with_group;
+    }
+#endif
+
   ret = tls_init_info(&tcb->cmn);
   if (ret < OK)
     {
@@ -241,6 +256,14 @@ int nxtask_init(FAR struct task_tcb_s *tcb, const char *name, int priority,
     }
 #endif
 
+#ifdef TRUSTRAM_EXIT_NATIVE_INIT_PROBE
+  ret = board_trustram_exit_init_seal(&tcb->cmn);
+  if (ret < OK)
+    {
+      goto errout_with_group;
+    }
+#endif
+
   group_initialize(tcb);
 #ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
   tr_observe_note((uintptr_t)tcb, TR_OBS_INITIALIZED, tcb->cmn.pid);
@@ -248,6 +271,14 @@ int nxtask_init(FAR struct task_tcb_s *tcb, const char *name, int priority,
   return ret;
 
 errout_with_group:
+#ifdef TRUSTRAM_EXIT_NATIVE_INIT_PROBE
+  if (tcb->cmn.task_state == TSTATE_TASK_INACTIVE)
+    {
+      nxsched_rollback_inactive(&tcb->cmn);
+    }
+
+  board_trustram_exit_init_abort(&tcb->cmn);
+#endif
 #ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
   if (TRUSTRAM_NATIVE_TASK(&tcb->cmn) &&
       tcb->cmn.task_state == TSTATE_TASK_INACTIVE)

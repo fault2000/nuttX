@@ -90,7 +90,7 @@ static void nxsched_releasepid(pid_t pid)
 
 #if defined(CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS) || \
     defined(CONFIG_ARM_TRUSTRAM_NATIVE_BOOT) || \
-    defined(TRUSTRAM_BOOT_TASK_PUBLISH_PROBE)
+    defined(TRUSTRAM_BOOT_TASK_PUBLISH_PROBE) || defined(TRUSTRAM_EXIT_NATIVE_INIT_PROBE)
 /****************************************************************************
  * Name: nxsched_rollback_inactive
  *

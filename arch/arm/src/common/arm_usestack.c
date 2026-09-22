@@ -24,6 +24,10 @@
 
 #include <nuttx/config.h>
 
+#ifdef TRUSTRAM_EXIT_NATIVE_INIT_PROBE
+#  include <nuttx/trustram_exit_init.h>
+#endif
+
 #ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
 #  include <nuttx/trustram_native_boot.h>
 #endif
@@ -80,6 +84,9 @@
 
 int up_use_stack(struct tcb_s *tcb, void *stack, size_t stack_size)
 {
+#ifdef TRUSTRAM_EXIT_NATIVE_INIT_PROBE
+  return board_trustram_exit_init_stack(tcb, stack, stack_size);
+#else
 #ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
   if (TRUSTRAM_NATIVE_TASK(tcb))
     {
@@ -166,4 +173,5 @@ int up_use_stack(struct tcb_s *tcb, void *stack, size_t stack_size)
 
   return OK;
 #endif /* CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS */
+#endif /* TRUSTRAM_EXIT_NATIVE_INIT_PROBE */
 }
