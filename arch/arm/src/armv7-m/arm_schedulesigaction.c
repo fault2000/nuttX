@@ -23,6 +23,9 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
+#ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
+#  include <nuttx/trustram_aw_runtime.h>
+#endif
 
 #include <stdint.h>
 #include <sched.h>
@@ -82,6 +85,13 @@
 #ifndef CONFIG_SMP
 void up_schedule_sigaction(struct tcb_s *tcb, sig_deliver_t sigdeliver)
 {
+#ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
+  if (TRUSTRAM_AW_RUNTIME_TASK(tcb))
+    {
+      /* No signal trampoline or arbitrary interrupted PC is admitted. */
+      board_aw_runtime_fault();
+    }
+#endif
   sinfo("tcb=%p sigdeliver=%p\n", tcb, sigdeliver);
   DEBUGASSERT(tcb != NULL && sigdeliver != NULL);
 

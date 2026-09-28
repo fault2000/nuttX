@@ -23,6 +23,13 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
+#ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
+#  include <nuttx/trustram_aw_runtime.h>
+#endif
+
+#ifdef CONFIG_ARM_TRUSTRAM_AW_BOOT
+#  include <nuttx/trustram_aw_boot.h>
+#endif
 
 #ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
 #  include <nuttx/trustram_native_boot.h>
@@ -80,6 +87,20 @@
 
 void up_release_stack(struct tcb_s *dtcb, uint8_t ttype)
 {
+#ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
+  if (TRUSTRAM_AW_RUNTIME_TASK(dtcb))
+    {
+      board_aw_runtime_release_stack(dtcb, ttype);
+      return;
+    }
+#endif
+#ifdef CONFIG_ARM_TRUSTRAM_AW_BOOT
+  if (TRUSTRAM_AW_TASK(dtcb))
+    {
+      board_aw_boot_release_stack(dtcb, ttype);
+      return;
+    }
+#endif
 #ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
   if (TRUSTRAM_NATIVE_TASK(dtcb))
     {

@@ -23,6 +23,13 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
+#ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
+#  include <nuttx/trustram_aw_runtime.h>
+#endif
+
+#ifdef CONFIG_ARM_TRUSTRAM_AW_BOOT
+#  include <nuttx/trustram_aw_boot.h>
+#endif
 
 #ifdef TRUSTRAM_EXIT_NATIVE_INIT_PROBE
 #  include <nuttx/trustram_exit_init.h>
@@ -84,6 +91,18 @@
 
 int up_use_stack(struct tcb_s *tcb, void *stack, size_t stack_size)
 {
+#ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
+  if (TRUSTRAM_AW_RUNTIME_TASK(tcb))
+    {
+      return board_aw_runtime_use_stack(tcb, stack, stack_size);
+    }
+#endif
+#ifdef CONFIG_ARM_TRUSTRAM_AW_BOOT
+  if (TRUSTRAM_AW_TASK(tcb))
+    {
+      return board_aw_boot_use_stack(tcb, stack, stack_size);
+    }
+#endif
 #ifdef TRUSTRAM_EXIT_NATIVE_INIT_PROBE
   return board_trustram_exit_init_stack(tcb, stack, stack_size);
 #else

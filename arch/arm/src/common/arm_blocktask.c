@@ -23,6 +23,13 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
+#ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
+#  include <nuttx/trustram_aw_runtime.h>
+#endif
+
+#ifdef CONFIG_ARM_TRUSTRAM_AW_BOOT
+#  include <nuttx/trustram_aw_boot.h>
+#endif
 
 #include <stdbool.h>
 #include <sched.h>
@@ -67,6 +74,28 @@ void up_block_task(struct tcb_s *tcb, tstate_t task_state)
 {
   struct tcb_s *rtcb = this_task();
   bool switch_needed;
+
+#ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
+  /* Native creation/cleanup can acquire heap, file, or driver locks on the
+   * private service stack.  Scheduler locking does not make those locks
+   * uncontended.  Reject a blocking attempt before altering scheduler queues
+   * or switching an ordinary caller whose physical stack is still private.
+   */
+
+  board_aw_runtime_check_block();
+  if (TRUSTRAM_AW_RUNTIME_TASK(tcb))
+    {
+      /* The admitted BODY has no blocking or native calls. */
+      board_aw_runtime_fault();
+    }
+#endif
+#ifdef CONFIG_ARM_TRUSTRAM_AW_BOOT
+  if (TRUSTRAM_AW_TASK(tcb))
+    {
+      /* The fixed body cannot block or yield.  Exit owns its only handoff. */
+      board_aw_boot_fault();
+    }
+#endif
 
 #ifdef CONFIG_ARM_TRUSTRAM_COOPERATIVE_TEST
   /* The closed diagnostic has no IRQ-side scheduler path. Reject before
@@ -164,7 +193,17 @@ void up_block_task(struct tcb_s *tcb, tstate_t task_state)
           else
 #endif
             {
-              arm_switchcontext(&rtcb->xcp.regs, nexttcb->xcp.regs);
+#ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
+                  if (TRUSTRAM_AW_RUNTIME_TASK(rtcb) ||
+                      TRUSTRAM_AW_RUNTIME_TASK(nexttcb))
+                    {
+                      board_aw_runtime_switch(rtcb, nexttcb);
+                    }
+                  else
+#endif
+                    {
+                      arm_switchcontext(&rtcb->xcp.regs, nexttcb->xcp.regs);
+                    }
             }
 
 #if defined(TRUSTRAM_BOOT_WORKER_WAKE_PROBE) && defined(__arm__)

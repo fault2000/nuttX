@@ -1337,4 +1337,31 @@ config ARM_TRUSTRAM_NATIVE_BOOT
 	  protection. Runtime teardown of this permanent HPWORK is unsupported.
 	  It does not enable the host-only ARCH_TRUSTRAM_CONTEXT_HOOKS interface.
 
+config ARM_TRUSTRAM_AW_BOOT
+	bool "TRUST-RAM AW fixed native task boot integration"
+	default n
+	depends on BUILD_FLAT && ARCH_CORTEXM7 && ARCH_FPU && ARMV7M_USEBASEPRI
+	depends on ARM_MPU && !SMP && !ARCH_HIPRI_INTERRUPT
+	depends on !ARM_TRUSTRAM_COOPERATIVE_TEST && !ARM_TRUSTRAM_NATIVE_BOOT
+	depends on !ARCH_TRUSTRAM_CONTEXT_HOOKS
+	depends on !SUPPRESS_INTERRUPTS && !SCHED_HAVE_PARENT
+	help
+	  Create one fixed AW kernel task using the real task, group, PID and
+	  scheduler services before IRQ and device bring-up.  Its first entry
+	  uses a protected AW frame; its normal exit performs native teardown
+	  and deferred off-stack scrub before restoring the boot idle task.
+	  The board must provide reserved storage and all declared services.
+	  Other tasks retain native handling.  This is a bounded boot path,
+	  not general runtime task/IRQ protection or whole-image admission.
+
+config ARM_TRUSTRAM_AW_RUNTIME
+	bool "TRUST-RAM AW fixed task runtime IRQ checkpoint"
+	default n
+	depends on ARM_TRUSTRAM_AW_BOOT
+	help
+	  Run a reserved AW kernel task after normal PX4 startup and protect its
+	  admitted assembly BODY frames across native IRQ and scheduler returns.
+	  The board supplies private entry/exit gates and a finite PC policy.
+	  Other tasks retain native handling; whole-image protection is absent.
+
 endif # ARCH_ARM

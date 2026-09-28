@@ -44,6 +44,10 @@
 #include <nuttx/drivers/drivers.h>
 #include <nuttx/init.h>
 
+#ifdef CONFIG_ARM_TRUSTRAM_AW_BOOT
+#  include <nuttx/trustram_aw_boot.h>
+#endif
+
 #ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
 #  include <nuttx/trustram_observe.h>
 #endif
@@ -332,6 +336,13 @@ uint8_t g_nx_initstate;  /* See enum nx_initstate_e */
  */
 
 static struct task_tcb_s g_idletcb[CONFIG_SMP_NCPUS];
+
+#ifdef CONFIG_ARM_TRUSTRAM_AW_BOOT
+/* Exact source identity for the bounded AW task's first switch and exit. */
+struct tcb_s *const g_trustram_aw_boot_idle
+  __attribute__((section(".rodata.trustram_aw_boot_idle"), used)) =
+  &g_idletcb[0].cmn;
+#endif
 
 #ifdef TRUSTRAM_EXIT_BOOT_PROBE
 /* Actual idle identity; no substitute TCB or scheduler globals. */
@@ -749,6 +760,15 @@ void nx_start(void)
   /* Initialize the file system (needed to support device drivers) */
 
   fs_initialize();
+
+#ifdef CONFIG_ARM_TRUSTRAM_AW_BOOT
+  /* Heap/PID/idle group/filesystem exist.  No hardware IRQ, timer, device
+   * or worker bring-up has occurred.  The board creates and runs one native
+   * task, tears it down off-stack, then returns with boot ownership intact.
+   */
+
+  board_aw_boot_entry();
+#endif
 
   /* Initialize the interrupt handling subsystem (if included) */
 

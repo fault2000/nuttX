@@ -23,6 +23,13 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
+#ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
+#  include <nuttx/trustram_aw_runtime.h>
+#endif
+
+#ifdef CONFIG_ARM_TRUSTRAM_AW_BOOT
+#  include <nuttx/trustram_aw_boot.h>
+#endif
 
 #include <sched.h>
 #include <debug.h>
@@ -113,6 +120,24 @@ static void _up_dumponexit(struct tcb_s *tcb, void *arg)
 void up_exit(int status)
 {
   struct tcb_s *tcb = this_task();
+
+#ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
+  if (TRUSTRAM_AW_RUNTIME_TASK(tcb))
+    {
+      board_aw_runtime_exit(status);
+    }
+#endif
+#ifdef CONFIG_ARM_TRUSTRAM_AW_BOOT
+  if (TRUSTRAM_AW_TASK(tcb))
+    {
+      /* A naked board entry moves to a private stack before native teardown.
+       * It must invoke nxtask_exit(), validate the actual selected idle TCB,
+       * then restore the protected capture rather than tcb->xcp.regs.
+       */
+
+      board_aw_boot_exit(status);
+    }
+#endif
 
 #ifdef TRUSTRAM_EXIT_SOURCE_PROBE
   /* Exclusive boot probe: admit native exit. The cleanup extension runs

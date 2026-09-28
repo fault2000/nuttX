@@ -23,6 +23,15 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
+#ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
+#  include <nuttx/trustram_aw_runtime.h>
+#endif
+
+#ifdef CONFIG_ARM_TRUSTRAM_AW_BOOT
+#  include <nuttx/trustram_aw_boot.h>
+#  include <nuttx/irq.h>
+#  include <assert.h>
+#endif
 
 #ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
 #  include <nuttx/trustram_observe.h>
@@ -92,6 +101,7 @@ static void nxsched_releasepid(pid_t pid)
  ****************************************************************************/
 
 #if defined(CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS) || \
+    defined(CONFIG_ARM_TRUSTRAM_AW_BOOT) || \
     defined(CONFIG_ARM_TRUSTRAM_NATIVE_BOOT) || \
     defined(TRUSTRAM_BOOT_TASK_PUBLISH_PROBE) || defined(TRUSTRAM_EXIT_NATIVE_INIT_PROBE)
 /****************************************************************************
@@ -162,6 +172,18 @@ int nxsched_release_tcb(FAR struct tcb_s *tcb, uint8_t ttype)
 
   if (tcb)
     {
+#ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
+      if (TRUSTRAM_AW_RUNTIME_TASK(tcb))
+        {
+          board_aw_runtime_release_begin(tcb);
+        }
+#endif
+#ifdef CONFIG_ARM_TRUSTRAM_AW_BOOT
+      if (TRUSTRAM_AW_TASK(tcb))
+        {
+          board_aw_boot_release_begin(tcb);
+        }
+#endif
 #ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
       struct tr_observe_token observation =
         tr_observe_releasing((uintptr_t)tcb);
@@ -242,6 +264,29 @@ int nxsched_release_tcb(FAR struct tcb_s *tcb, uint8_t ttype)
       group_leave(tcb);
 
       /* And, finally, release the TCB itself */
+
+#ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
+      if (TRUSTRAM_AW_RUNTIME_TASK(tcb))
+        {
+          board_aw_runtime_cleanup_complete(tcb);
+          return ret;
+        }
+#endif
+
+#ifdef CONFIG_ARM_TRUSTRAM_AW_BOOT
+      if (TRUSTRAM_AW_TASK(tcb))
+        {
+          /* PID, group and stack-release callbacks have finished.  Backing
+           * remains reserved until the board proves the off-stack handoff.
+           */
+
+          board_aw_boot_cleanup_complete(tcb);
+#ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
+          tr_observe_released(observation, ret);
+#endif
+          return ret;
+        }
+#endif
 
 #if defined(TRUSTRAM_EXIT_CLEANUP_PROBE)
       board_trustram_exit_cleanup_complete_tcb(tcb);

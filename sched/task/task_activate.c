@@ -23,6 +23,13 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
+#ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
+#  include <nuttx/trustram_aw_runtime.h>
+#endif
+
+#ifdef CONFIG_ARM_TRUSTRAM_AW_BOOT
+#  include <nuttx/trustram_aw_boot.h>
+#endif
 
 #ifdef TRUSTRAM_EXIT_NATIVE_INIT_PROBE
 #  include <nuttx/trustram_exit_init.h>
@@ -72,6 +79,19 @@ void nxtask_activate(FAR struct tcb_s *tcb)
 #endif
 
   irqstate_t flags = enter_critical_section();
+
+#ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
+  if (TRUSTRAM_AW_RUNTIME_TASK(tcb))
+    {
+      board_aw_runtime_activate(tcb);
+    }
+#endif
+#ifdef CONFIG_ARM_TRUSTRAM_AW_BOOT
+  if (TRUSTRAM_AW_TASK(tcb))
+    {
+      board_aw_boot_activate(tcb);
+    }
+#endif
 
 #ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
   up_trustram_context_activate(tcb);

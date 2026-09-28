@@ -141,6 +141,12 @@
 	.thumb_func
 	.type	exception_common, function
 exception_common:
+#ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
+	b.w board_aw_runtime_exception
+	.global board_aw_runtime_native_exception
+	.thumb_func
+board_aw_runtime_native_exception:
+#endif
 #ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
 	/* One trusted-boot transition, before native software stacking. */
 	ldr r0, =g_trustram_native_boot_route
@@ -248,6 +254,12 @@ exception_common:
 	 * array to use for the interrupt return.
 	 */
 
+#ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
+	b.w board_aw_runtime_exception_return
+	.global board_aw_runtime_native_restore
+	.thumb_func
+board_aw_runtime_native_restore:
+#endif
 	ldmia		r0!, {r2-r11,r14}	/* Recover R4-R11, r14 + 2 temp values */
 #ifdef CONFIG_ARCH_FPU
 	/* Switched-in task including volatile FP registers ? */

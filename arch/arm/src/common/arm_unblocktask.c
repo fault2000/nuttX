@@ -23,6 +23,13 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
+#ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
+#  include <nuttx/trustram_aw_runtime.h>
+#endif
+
+#ifdef CONFIG_ARM_TRUSTRAM_AW_BOOT
+#  include <nuttx/trustram_aw_boot.h>
+#endif
 
 #include <sched.h>
 #include <assert.h>
@@ -101,6 +108,12 @@ void up_unblock_task(struct tcb_s *tcb)
 
       if (CURRENT_REGS)
         {
+#ifdef CONFIG_ARM_TRUSTRAM_AW_BOOT
+          if (TRUSTRAM_AW_TASK(rtcb) || TRUSTRAM_AW_TASK(this_task()))
+            {
+              board_aw_boot_fault();
+            }
+#endif
 #ifdef TRUSTRAM_BOOT_WORKER_WAKE_PROBE
           board_trustram_boot_fault();
 #else
@@ -160,7 +173,26 @@ void up_unblock_task(struct tcb_s *tcb)
           else
 #endif
             {
-              arm_switchcontext(&rtcb->xcp.regs, nexttcb->xcp.regs);
+#ifdef CONFIG_ARM_TRUSTRAM_AW_BOOT
+              if (TRUSTRAM_AW_TASK(rtcb) || TRUSTRAM_AW_TASK(nexttcb))
+                {
+                  board_aw_boot_switch(rtcb, nexttcb);
+                }
+              else
+#endif
+                {
+    #ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
+                  if (TRUSTRAM_AW_RUNTIME_TASK(rtcb) ||
+                      TRUSTRAM_AW_RUNTIME_TASK(nexttcb))
+                    {
+                      board_aw_runtime_switch(rtcb, nexttcb);
+                    }
+                  else
+#endif
+                    {
+                      arm_switchcontext(&rtcb->xcp.regs, nexttcb->xcp.regs);
+                    }
+                }
             }
 
 #if defined(TRUSTRAM_BOOT_WORKER_CYCLE_PROBE) && defined(__arm__)

@@ -23,6 +23,13 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
+#ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
+#  include <nuttx/trustram_aw_runtime.h>
+#endif
+
+#ifdef CONFIG_ARM_TRUSTRAM_AW_BOOT
+#  include <nuttx/trustram_aw_boot.h>
+#endif
 
 #ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
 #  include <nuttx/trustram_observe.h>
@@ -125,6 +132,24 @@ void nxtask_start(void)
   FAR struct task_tcb_s *tcb = (FAR struct task_tcb_s *)this_task();
   int exitcode = EXIT_FAILURE;
   int argc;
+
+#ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
+  if (TRUSTRAM_AW_RUNTIME_TASK(&tcb->cmn))
+    {
+      exit(board_aw_runtime_startup(&tcb->cmn));
+    }
+#endif
+#ifdef CONFIG_ARM_TRUSTRAM_AW_BOOT
+  if (TRUSTRAM_AW_TASK(&tcb->cmn))
+    {
+      /* The immutable assembly root has already admitted its AW shadow.
+       * The board checks the retained creation recipe before calling main;
+       * ordinary TCB entry/argv fields are not independent authority.
+       */
+
+      exit(board_aw_boot_startup(&tcb->cmn));
+    }
+#endif
 
   DEBUGASSERT((tcb->cmn.flags & TCB_FLAG_TTYPE_MASK) != \
               TCB_FLAG_TTYPE_PTHREAD);

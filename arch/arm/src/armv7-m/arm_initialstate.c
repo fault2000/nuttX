@@ -23,6 +23,13 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
+#ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
+#  include <nuttx/trustram_aw_runtime.h>
+#endif
+
+#ifdef CONFIG_ARM_TRUSTRAM_AW_BOOT
+#  include <nuttx/trustram_aw_boot.h>
+#endif
 
 #ifdef TRUSTRAM_EXIT_NATIVE_INIT_PROBE
 #  include <nuttx/trustram_exit_init.h>
@@ -71,6 +78,20 @@
 
 void up_initial_state(struct tcb_s *tcb)
 {
+#ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
+  if (TRUSTRAM_AW_RUNTIME_TASK(tcb))
+    {
+      board_aw_runtime_initial(tcb);
+      return;
+    }
+#endif
+#ifdef CONFIG_ARM_TRUSTRAM_AW_BOOT
+  if (TRUSTRAM_AW_TASK(tcb))
+    {
+      board_aw_boot_initial(tcb);
+      return;
+    }
+#endif
 #ifdef TRUSTRAM_EXIT_NATIVE_INIT_PROBE
   board_trustram_exit_init_initial(tcb);
   return;

@@ -23,6 +23,9 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
+#ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
+#  include <nuttx/trustram_aw_runtime.h>
+#endif
 
 #ifdef TRUSTRAM_EXIT_NATIVE_INIT_PROBE
 #  include <nuttx/trustram_exit_init.h>
@@ -41,6 +44,10 @@
 
 #include <nuttx/arch.h>
 #include <nuttx/sched.h>
+
+#ifdef CONFIG_ARM_TRUSTRAM_AW_BOOT
+#  include <nuttx/trustram_aw_boot.h>
+#endif
 
 #ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
 #  include <nuttx/trustram_native_boot.h>
@@ -104,6 +111,20 @@ int nxtask_init(FAR struct task_tcb_s *tcb, const char *name, int priority,
                 FAR char * const envp[])
 {
   int ret;
+  start_t start = nxtask_start;
+#ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
+  if (TRUSTRAM_AW_RUNTIME_TASK((struct tcb_s *)tcb))
+    {
+      board_aw_runtime_check_create((struct tcb_s *)tcb, stack, stack_size, entry);
+    }
+#endif
+#ifdef CONFIG_ARM_TRUSTRAM_AW_BOOT
+  if (TRUSTRAM_AW_TASK((struct tcb_s *)tcb))
+    {
+      board_aw_boot_check_create((struct tcb_s *)tcb, stack, stack_size,
+                                  entry);
+    }
+#endif
 #ifdef TRUSTRAM_EXIT_NATIVE_INIT_PROBE
   board_trustram_exit_init_check((struct tcb_s *)tcb);
 #endif
@@ -198,7 +219,28 @@ int nxtask_init(FAR struct task_tcb_s *tcb, const char *name, int priority,
       goto errout_with_group;
     }
 
+#ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
+  if (TRUSTRAM_AW_RUNTIME_TASK(&tcb->cmn))
+    {
+      ret = board_aw_runtime_prepare(&tcb->cmn);
+      if (ret < OK)
+        {
+          goto errout_with_group;
+        }
+    }
+#endif
   /* Initialize thread local storage */
+
+#ifdef CONFIG_ARM_TRUSTRAM_AW_BOOT
+  if (TRUSTRAM_AW_TASK(&tcb->cmn))
+    {
+      ret = board_aw_boot_prepare(&tcb->cmn);
+      if (ret < OK)
+        {
+          goto errout_with_group;
+        }
+    }
+#endif
 
 #ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
   stack_acquired = true;
@@ -227,7 +269,20 @@ int nxtask_init(FAR struct task_tcb_s *tcb, const char *name, int priority,
 
   /* Initialize the task control block */
 
-  ret = nxtask_setup_scheduler(tcb, priority, nxtask_start,
+#ifdef CONFIG_ARM_TRUSTRAM_AW_BOOT
+  if (TRUSTRAM_AW_TASK(&tcb->cmn))
+    {
+      start = board_aw_boot_root;
+    }
+#endif
+
+#ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
+  if (TRUSTRAM_AW_RUNTIME_TASK(&tcb->cmn))
+    {
+      start = board_aw_runtime_root;
+    }
+#endif
+  ret = nxtask_setup_scheduler(tcb, priority, start,
                                entry, ttype);
   if (ret < OK)
     {
@@ -248,6 +303,17 @@ int nxtask_init(FAR struct task_tcb_s *tcb, const char *name, int priority,
 
   /* Now we have enough in place that we can join the group */
 
+#ifdef CONFIG_ARM_TRUSTRAM_AW_BOOT
+  if (TRUSTRAM_AW_TASK(&tcb->cmn))
+    {
+      ret = board_aw_boot_seal(&tcb->cmn);
+      if (ret < OK)
+        {
+          goto errout_with_group;
+        }
+    }
+#endif
+
 #ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
   ret = up_trustram_context_seal(&tcb->cmn);
   if (ret < OK)
@@ -264,6 +330,16 @@ int nxtask_init(FAR struct task_tcb_s *tcb, const char *name, int priority,
     }
 #endif
 
+#ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
+  if (TRUSTRAM_AW_RUNTIME_TASK(&tcb->cmn))
+    {
+      ret = board_aw_runtime_seal(&tcb->cmn);
+      if (ret < OK)
+        {
+          goto errout_with_group;
+        }
+    }
+#endif
   group_initialize(tcb);
 #ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
   tr_observe_note((uintptr_t)tcb, TR_OBS_INITIALIZED, tcb->cmn.pid);
@@ -271,6 +347,28 @@ int nxtask_init(FAR struct task_tcb_s *tcb, const char *name, int priority,
   return ret;
 
 errout_with_group:
+#ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
+  if (TRUSTRAM_AW_RUNTIME_TASK(&tcb->cmn))
+    {
+      if (tcb->cmn.task_state == TSTATE_TASK_INACTIVE)
+        {
+          nxsched_rollback_inactive(&tcb->cmn);
+        }
+      board_aw_runtime_abort(&tcb->cmn);
+    }
+#endif
+#ifdef CONFIG_ARM_TRUSTRAM_AW_BOOT
+  if (TRUSTRAM_AW_TASK(&tcb->cmn))
+    {
+      if (tcb->cmn.task_state == TSTATE_TASK_INACTIVE)
+        {
+          nxsched_rollback_inactive(&tcb->cmn);
+        }
+
+      /* Cancellation only; group teardown below still owns native writes. */
+      board_aw_boot_abort(&tcb->cmn);
+    }
+#endif
 #ifdef TRUSTRAM_EXIT_NATIVE_INIT_PROBE
   if (tcb->cmn.task_state == TSTATE_TASK_INACTIVE)
     {
@@ -353,6 +451,19 @@ errout_with_group:
 
 void nxtask_uninit(FAR struct task_tcb_s *tcb)
 {
+#ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
+  if (TRUSTRAM_AW_RUNTIME_TASK((struct tcb_s *)tcb))
+    {
+      board_aw_runtime_check_uninit((struct tcb_s *)tcb);
+    }
+#endif
+#ifdef CONFIG_ARM_TRUSTRAM_AW_BOOT
+  if (TRUSTRAM_AW_TASK((struct tcb_s *)tcb))
+    {
+      /* The fixed constructor owns cancellation and backing reclamation. */
+      board_aw_boot_fault();
+    }
+#endif
 #ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
   if (TRUSTRAM_NATIVE_TASK((struct tcb_s *)tcb))
     {
@@ -368,6 +479,12 @@ void nxtask_uninit(FAR struct task_tcb_s *tcb)
    */
 
   dq_rem((FAR dq_entry_t *)tcb, (FAR dq_queue_t *)&g_inactivetasks);
+#ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
+  if (TRUSTRAM_AW_RUNTIME_TASK(&tcb->cmn))
+    {
+      board_aw_runtime_abort(&tcb->cmn);
+    }
+#endif
 
 #ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
   up_trustram_context_abort(&tcb->cmn);

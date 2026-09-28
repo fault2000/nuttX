@@ -23,6 +23,13 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
+#ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
+#  include <nuttx/trustram_aw_runtime.h>
+#endif
+
+#ifdef CONFIG_ARM_TRUSTRAM_AW_BOOT
+#  include <nuttx/trustram_aw_boot.h>
+#endif
 
 #include <sched.h>
 #include <debug.h>
@@ -69,6 +76,13 @@ void up_release_pending(void)
 
       if (CURRENT_REGS)
         {
+#ifdef CONFIG_ARM_TRUSTRAM_AW_BOOT
+          if (TRUSTRAM_AW_TASK(rtcb) || TRUSTRAM_AW_TASK(this_task()))
+            {
+              /* No IRQ dispatcher is part of the bounded boot lifetime. */
+              board_aw_boot_fault();
+            }
+#endif
           /* Yes, then we have to do things differently.
            * Just copy the CURRENT_REGS into the OLD rtcb.
            */
@@ -106,7 +120,30 @@ void up_release_pending(void)
            * ready to run list.
            */
 
-          arm_switchcontext(&rtcb->xcp.regs, nexttcb->xcp.regs);
+#ifdef CONFIG_ARM_TRUSTRAM_AW_BOOT
+          if (TRUSTRAM_AW_TASK(rtcb) || TRUSTRAM_AW_TASK(nexttcb))
+            {
+              /* Do not read an ordinary incoming frame pointer.  The board
+               * captures the real outgoing SVC and consumes its AW packet.
+               */
+
+              board_aw_boot_switch(rtcb, nexttcb);
+            }
+          else
+#endif
+            {
+#ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
+                  if (TRUSTRAM_AW_RUNTIME_TASK(rtcb) ||
+                      TRUSTRAM_AW_RUNTIME_TASK(nexttcb))
+                    {
+                      board_aw_runtime_switch(rtcb, nexttcb);
+                    }
+                  else
+#endif
+                    {
+                      arm_switchcontext(&rtcb->xcp.regs, nexttcb->xcp.regs);
+                    }
+            }
 #ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
           __asm__ __volatile__(".global up_trustram_native_boot_after_switch\n"
                                ".hidden up_trustram_native_boot_after_switch\n"

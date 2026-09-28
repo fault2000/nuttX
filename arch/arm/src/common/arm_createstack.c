@@ -23,6 +23,13 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
+#ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
+#  include <nuttx/trustram_aw_runtime.h>
+#endif
+
+#ifdef CONFIG_ARM_TRUSTRAM_AW_BOOT
+#  include <nuttx/trustram_aw_boot.h>
+#endif
 
 #ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
 #  include <nuttx/trustram_native_boot.h>
@@ -91,6 +98,19 @@
 
 int up_create_stack(struct tcb_s *tcb, size_t stack_size, uint8_t ttype)
 {
+#ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
+  if (TRUSTRAM_AW_RUNTIME_TASK(tcb))
+    {
+      board_aw_runtime_fault();
+    }
+#endif
+#ifdef CONFIG_ARM_TRUSTRAM_AW_BOOT
+  if (TRUSTRAM_AW_TASK(tcb))
+    {
+      /* The immutable constructor supplies already registered backing. */
+      board_aw_boot_fault();
+    }
+#endif
 #ifdef CONFIG_ARM_TRUSTRAM_NATIVE_BOOT
   if (TRUSTRAM_NATIVE_TASK(tcb))
     {
