@@ -74,12 +74,20 @@
 
 /* General Constants ********************************************************/
 
-#define INFINITY    (1.0/0.0)
-#define NAN         (0.0/0.0)
-#define HUGE_VAL    INFINITY
+/* ISO C requires INFINITY and NAN to have type float; HUGE_VAL is double.
+ * Builtins are constant expressions in C++ aggregate initializers as well. */
+#if defined(__GNUC__) || defined(__clang__)
+#  define INFINITY  (__builtin_inff())
+#  define NAN       (__builtin_nanf(""))
+#  define HUGE_VAL  (__builtin_huge_val())
+#else
+#  define INFINITY  (1.0F/0.0F)
+#  define NAN       (0.0F/0.0F)
+#  define HUGE_VAL  (1.0/0.0)
+#endif
 
-#define INFINITY_F  (1.0F/0.0F)
-#define NAN_F       (0.0F/0.0F)
+#define INFINITY_F  INFINITY
+#define NAN_F       NAN
 
 #define isnan(x)    ((x) != (x))
 #define isinf(x)    (((x) == INFINITY) || ((x) == -INFINITY))
