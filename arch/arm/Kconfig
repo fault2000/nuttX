@@ -1364,4 +1364,15 @@ config ARM_TRUSTRAM_AW_RUNTIME
 	  The board supplies private entry/exit gates and a finite PC policy.
 	  Other tasks retain native handling; whole-image protection is absent.
 
+config ARM_TRUSTRAM_AW_RUNTIME_RX
+	bool "TRUST-RAM AW received leaf runtime integration"
+	default n
+	depends on ARM_TRUSTRAM_AW_RUNTIME
+	help
+	  Admit one sealed UART5 AW-R1 leaf into a reserved real AW task. Exact
+	  RAM instruction points use the existing runtime IRQ/context lifetime.
+	  The board supplies protected transaction/policy/reply services and a
+	  dedicated UART5 supervisor. This is not arbitrary code admission or
+	  whole-image protection. The fixed Flash runtime profile is unchanged.
+
 endif # ARCH_ARM

@@ -103,6 +103,27 @@
 #define SRAM_START STM32_AXISRAM_BASE
 #define SRAM_END   (SRAM_START + STM32H7_SRAM_SIZE)
 
+/* A Flat-board descriptor reservation must never be colored or handed to
+ * the ordinary allocator. Keep the physical SRAM end for other build modes.
+ */
+
+#ifndef BOARD_AXI_RSVD_TAIL_SIZE
+#  define BOARD_AXI_RSVD_TAIL_SIZE 0
+#endif
+
+#if BOARD_AXI_RSVD_TAIL_SIZE < 0 || \
+    BOARD_AXI_RSVD_TAIL_SIZE >= STM32H7_SRAM_SIZE
+#  error "BOARD_AXI_RSVD_TAIL_SIZE must leave an AXI heap"
+#endif
+#if BOARD_AXI_RSVD_TAIL_SIZE > 0 && !defined(CONFIG_BUILD_FLAT)
+#  error "AXI descriptor reservation requires a Flat build"
+#endif
+
+#define AXI_HEAP_END (SRAM_END - BOARD_AXI_RSVD_TAIL_SIZE)
+#if BOARD_AXI_RSVD_TAIL_SIZE > 0
+const uintptr_t g_board_axi_heap_end = AXI_HEAP_END;
+#endif
+
 #define SRAM123_START STM32_SRAM123_BASE
 #define SRAM123_END   (SRAM123_START + STM32H7_SRAM123_SIZE)
 
@@ -301,8 +322,9 @@ void up_allocate_heap(void **heap_start, size_t *heap_size)
   /* Return the heap settings */
 
   board_autoled_on(LED_HEAPALLOCATE);
+  DEBUGASSERT(g_idle_topstack < AXI_HEAP_END);
   *heap_start = (void *)g_idle_topstack;
-  *heap_size  = SRAM_END - g_idle_topstack;
+  *heap_size  = AXI_HEAP_END - g_idle_topstack;
 
   /* Colorize the heap for debug */
 
