@@ -31,6 +31,14 @@
 #include <nuttx/irq.h>
 #include <nuttx/arch.h>
 
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+#  define AW_CPU_PINS_IRQ_INTRINSICS_ONLY 1
+#  include "aw_cpu_pins_irq.h"
+#  if defined(CONFIG_ARCH_RAMVECTORS) || defined(CONFIG_ARCH_HIPRI_INTERRUPT) || !defined(CONFIG_ARMV7M_USEBASEPRI) || defined(CONFIG_DEBUG_IRQ_INFO)
+#    error "AW CPU IRQ initialization requires fixed Flash vectors, BASEPRI and no high-priority/debug IRQ mode"
+#  endif
+#endif
+
 #include <arch/irq.h>
 #include <arch/armv7-m/nvicpri.h>
 
@@ -246,7 +254,7 @@ static int stm32_reserved(int irq, void *context, void *arg)
  *
  ****************************************************************************/
 
-#ifdef CONFIG_ARMV7M_USEBASEPRI
+#if defined(CONFIG_ARMV7M_USEBASEPRI) && !defined(CONFIG_ARM_TRUSTRAM_AW_CPU)
 static inline void stm32_prioritize_syscall(int priority)
 {
   uint32_t regval;
@@ -269,6 +277,7 @@ static inline void stm32_prioritize_syscall(int priority)
  *
  ****************************************************************************/
 
+#ifndef CONFIG_ARM_TRUSTRAM_AW_CPU
 static int stm32_irqinfo(int irq, uintptr_t *regaddr, uint32_t *bit,
                        uintptr_t offset)
 {
@@ -403,6 +412,7 @@ static int stm32_irqinfo(int irq, uintptr_t *regaddr, uint32_t *bit,
 
   return OK;
 }
+#endif /* !CONFIG_ARM_TRUSTRAM_AW_CPU */
 
 /****************************************************************************
  * Public Functions
@@ -414,8 +424,11 @@ static int stm32_irqinfo(int irq, uintptr_t *regaddr, uint32_t *bit,
 
 void up_irqinitialize(void)
 {
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  aw_cpu_irq_initialize();
+#else
   uintptr_t regaddr;
-#if defined(CONFIG_DEBUG_SYMBOLS) && !defined(CONFIG_ARMV7M_USEBASEPRI)
+#if defined(CONFIG_DEBUG_SYMBOLS) && !defined(CONFIG_ARMV7M_USEBASEPRI) && !defined(CONFIG_ARM_TRUSTRAM_AW_CPU)
   uint32_t regval;
 #endif
   int nintlines;
@@ -478,6 +491,8 @@ void up_irqinitialize(void)
       putreg32(DEFPRIORITY32, regaddr);
     }
 
+#endif /* CONFIG_ARM_TRUSTRAM_AW_CPU */
+
   /* currents_regs is non-NULL only while processing an interrupt */
 
   CURRENT_REGS = NULL;
@@ -488,6 +503,7 @@ void up_irqinitialize(void)
    * under certain conditions.
    */
 
+#ifndef CONFIG_ARM_TRUSTRAM_AW_CPU
   irq_attach(STM32_IRQ_SVCALL, arm_svcall, NULL);
   irq_attach(STM32_IRQ_HARDFAULT, arm_hardfault, NULL);
 
@@ -496,7 +512,7 @@ void up_irqinitialize(void)
 #ifdef CONFIG_ARCH_IRQPRIO
   /* up_prioritize_irq(STM32_IRQ_PENDSV, NVIC_SYSH_PRIORITY_MIN); */
 #endif
-#ifdef CONFIG_ARMV7M_USEBASEPRI
+#if defined(CONFIG_ARMV7M_USEBASEPRI) && !defined(CONFIG_ARM_TRUSTRAM_AW_CPU)
   stm32_prioritize_syscall(NVIC_SYSH_SVCALL_PRIORITY);
 #endif
 
@@ -506,7 +522,9 @@ void up_irqinitialize(void)
 
 #ifdef CONFIG_ARM_MPU
   irq_attach(STM32_IRQ_MEMFAULT, arm_memfault, NULL);
+#ifndef CONFIG_ARM_TRUSTRAM_AW_CPU
   up_enable_irq(STM32_IRQ_MEMFAULT);
+#endif
 #endif
 
   /* Attach all other processor exceptions (except reset and sys tick) */
@@ -523,6 +541,8 @@ void up_irqinitialize(void)
   irq_attach(STM32_IRQ_RESERVED, stm32_reserved, NULL);
 #endif
 
+#endif /* !CONFIG_ARM_TRUSTRAM_AW_CPU: fixed private SVC/fault vectors */
+
   stm32_dumpnvic("initial", NR_IRQS);
 
   /* If a debugger is connected, try to prevent it from catching hardfaults.
@@ -530,7 +550,7 @@ void up_irqinitialize(void)
    * operation.
    */
 
-#if defined(CONFIG_DEBUG_SYMBOLS) && !defined(CONFIG_ARMV7M_USEBASEPRI)
+#if defined(CONFIG_DEBUG_SYMBOLS) && !defined(CONFIG_ARMV7M_USEBASEPRI) && !defined(CONFIG_ARM_TRUSTRAM_AW_CPU)
   regval  = getreg32(NVIC_DEMCR);
   regval &= ~NVIC_DEMCR_VCHARDERR;
   putreg32(regval, NVIC_DEMCR);
@@ -561,6 +581,9 @@ void up_irqinitialize(void)
 
 void up_disable_irq(int irq)
 {
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  aw_cpu_irq_disable((uint32_t)irq);
+#else
   uintptr_t regaddr;
   uint32_t regval;
   uint32_t bit;
@@ -596,6 +619,7 @@ void up_disable_irq(int irq)
 #if 0 /* Might be useful in early bring-up */
   stm32_dumpnvic("disable", irq);
 #endif
+#endif
 }
 
 /****************************************************************************
@@ -608,6 +632,9 @@ void up_disable_irq(int irq)
 
 void up_enable_irq(int irq)
 {
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  aw_cpu_irq_enable((uint32_t)irq);
+#else
   uintptr_t regaddr;
   uint32_t regval;
   uint32_t bit;
@@ -643,6 +670,7 @@ void up_enable_irq(int irq)
 #if 0 /* Might be useful in early bring-up */
   stm32_dumpnvic("enable", irq);
 #endif
+#endif
 }
 
 /****************************************************************************
@@ -671,6 +699,9 @@ void arm_ack_irq(int irq)
 #ifdef CONFIG_ARCH_IRQPRIO
 int up_prioritize_irq(int irq, int priority)
 {
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  return aw_cpu_irq_priority((uint32_t)irq, (uint32_t)priority);
+#else
   uint32_t regaddr;
   uint32_t regval;
   int shift;
@@ -703,5 +734,6 @@ int up_prioritize_irq(int irq, int priority)
 
   stm32_dumpnvic("prioritize", irq);
   return OK;
+#endif
 }
 #endif

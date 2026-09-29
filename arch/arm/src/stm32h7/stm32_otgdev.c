@@ -210,6 +210,128 @@
 #  error "FIFO allocations exceed FIFO memory size"
 #endif
 
+
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+# define AW_CPU_USB_INTRINSICS_ONLY 1
+# include "aw_cpu_usb.h"
+# if !defined(CONFIG_STM32H7_OTGFS) || defined(CONFIG_STM32H7_OTGHS) || defined(CONFIG_USBDEV_ISOCHRONOUS) || defined(CONFIG_USBDEV_VBUSSENSING) || defined(CONFIG_STM32H7_OTG_USBREGEN) || defined(CONFIG_STM32H7_USBDEV_REGDEBUG)
+#  error "AW CPU USB requires the fixed FS PIO device profile"
+# endif
+# if STM32_NENDPOINTS != 7 || STM32_RXFIFO_WORDS != 513 || STM32_EP0_TXFIFO_WORDS != 73 || STM32_EP1_TXFIFO_WORDS != 73 || STM32_EP2_TXFIFO_WORDS != 73 || STM32_EP3_TXFIFO_WORDS != 73 || STM32_EP4_TXFIFO_WORDS != 73 || STM32_EP5_TXFIFO_WORDS != 73 || STM32_EP6_TXFIFO_WORDS != 73
+#  error "AW CPU USB requires the admitted fixed FIFO layout"
+# endif
+# define AW_USB_GET_DIEPCTL(ep) aw_cpu_usb_ep_control_get((128u | (ep)))
+# define AW_USB_SET_DIEPCTL(ep,value) aw_cpu_usb_ep_control_set((128u | (ep)), (value))
+# define AW_USB_GET_DCTL() aw_cpu_usb_device_control_get()
+# define AW_USB_SET_DCTL(value) aw_cpu_usb_device_control_set((value))
+# define AW_USB_SET_DOEPTSIZ(ep,value) aw_cpu_usb_ep_size_set((ep), (value))
+# define AW_USB_GET_DOEPCTL(ep) aw_cpu_usb_ep_control_get((ep))
+# define AW_USB_SET_DOEPCTL(ep,value) aw_cpu_usb_ep_control_set((ep), (value))
+# define AW_USB_SET_DFIFO_DEP(ep,value) aw_cpu_usb_fifo_tx((ep), (value))
+# define AW_USB_GET_DIEPTSIZ(ep) aw_cpu_usb_ep_size_get((128u | (ep)))
+# define AW_USB_SET_DIEPTSIZ(ep,value) aw_cpu_usb_ep_size_set((128u | (ep)), (value))
+# define AW_USB_GET_DSTS() aw_cpu_usb_device_status()
+# define AW_USB_GET_DTXFSTS(ep) aw_cpu_usb_tx_space((ep))
+# define AW_USB_GET_DIEPEMPMSK() aw_cpu_usb_empty_mask_get()
+# define AW_USB_SET_DIEPEMPMSK(value) aw_cpu_usb_empty_mask_set((value))
+# define AW_USB_SET_DIEPTXF(ep,value) aw_cpu_usb_tx_fifo_config((ep), (value))
+# define AW_USB_GET_DFIFO_DEP(ep) aw_cpu_usb_fifo_rx()
+# define AW_USB_GET_DOEPTSIZ(ep) aw_cpu_usb_ep_size_get((ep))
+# define AW_USB_SET_DIEPINT(ep,value) aw_cpu_usb_ep_irq_ack((128u | (ep)), (value))
+# define AW_USB_SET_DOEPINT(ep,value) aw_cpu_usb_ep_irq_ack((ep), (value))
+# define AW_USB_SET_DAINT(value) aw_cpu_usb_endpoint_irq_ack((value))
+# define AW_USB_SET_DAINTMSK(value) aw_cpu_usb_endpoint_irq_mask_set((value))
+# define AW_USB_SET_DOEPMSK(value) aw_cpu_usb_out_irq_mask_set((value))
+# define AW_USB_SET_DIEPMSK(value) aw_cpu_usb_in_irq_mask_set((value))
+# define AW_USB_GET_DAINT() aw_cpu_usb_endpoint_irq_status()
+# define AW_USB_GET_DAINTMSK() aw_cpu_usb_endpoint_irq_mask_get()
+# define AW_USB_GET_DOEPINT(ep) aw_cpu_usb_ep_irq_get((ep))
+# define AW_USB_GET_DOEPMSK() aw_cpu_usb_out_irq_mask_get()
+# define AW_USB_GET_DIEPINT(ep) aw_cpu_usb_ep_irq_get((128u | (ep)))
+# define AW_USB_GET_DIEPMSK() aw_cpu_usb_in_irq_mask_get()
+# define AW_USB_GET_PCGCCTL() aw_cpu_usb_clock_get()
+# define AW_USB_SET_PCGCCTL(value) aw_cpu_usb_clock_set((value))
+# define AW_USB_GET_GRXSTSP() aw_cpu_usb_rx_pop()
+# define AW_USB_GET_GUSBCFG() aw_cpu_usb_phy_get()
+# define AW_USB_SET_GUSBCFG(value) aw_cpu_usb_phy_set((value))
+# define AW_USB_GET_GOTGINT() aw_cpu_usb_otg_irq_get()
+# define AW_USB_SET_GOTGINT(value) aw_cpu_usb_otg_irq_ack((value))
+# define AW_USB_GET_GINTSTS() aw_cpu_usb_irq_status()
+# define AW_USB_GET_GINTMSK() aw_cpu_usb_irq_mask_get()
+# define AW_USB_SET_GINTSTS(value) aw_cpu_usb_irq_ack((value))
+# define AW_USB_GET_BIDIR(ep,isin) aw_cpu_usb_ep_control_get((((isin) ? 128u : 0u) | (ep)))
+# define AW_USB_SET_BIDIR(ep,isin,value) aw_cpu_usb_ep_control_set((((isin) ? 128u : 0u) | (ep)), (value))
+# define AW_USB_GET_DCFG() aw_cpu_usb_device_config_get()
+# define AW_USB_SET_DCFG(value) aw_cpu_usb_device_config_set((value))
+# define AW_USB_SET_GRSTCTL(value) aw_cpu_usb_reset_request((value))
+# define AW_USB_GET_GRSTCTL() aw_cpu_usb_reset_get()
+# define AW_USB_SET_GAHBCFG(value) aw_cpu_usb_ahb_config((value))
+# define AW_USB_GET_GCCFG() aw_cpu_usb_phy_power_get()
+# define AW_USB_SET_GCCFG(value) aw_cpu_usb_phy_power_set((value))
+# define AW_USB_GET_GOTGCTL() aw_cpu_usb_session_get()
+# define AW_USB_SET_GOTGCTL(value) aw_cpu_usb_session_set((value))
+# define AW_USB_SET_GRXFSIZ(value) aw_cpu_usb_rx_fifo_config((value))
+# define AW_USB_SET_TXFIFO0(value) aw_cpu_usb_tx_fifo_config(0, value)
+# define AW_USB_SET_GINTMSK(value) aw_cpu_usb_irq_mask_set((value))
+# define AW_USB_GET_POWER() aw_cpu_usb_power_get()
+# define AW_USB_SET_POWER(value) aw_cpu_usb_power_set((value))
+#else
+# define AW_USB_GET_DIEPCTL(ep) stm32_getreg(STM32_OTG_DIEPCTL(ep))
+# define AW_USB_SET_DIEPCTL(ep,value) stm32_putreg((value), STM32_OTG_DIEPCTL(ep))
+# define AW_USB_GET_DCTL() stm32_getreg(STM32_OTG_DCTL)
+# define AW_USB_SET_DCTL(value) stm32_putreg((value), STM32_OTG_DCTL)
+# define AW_USB_SET_DOEPTSIZ(ep,value) stm32_putreg((value), STM32_OTG_DOEPTSIZ(ep))
+# define AW_USB_GET_DOEPCTL(ep) stm32_getreg(STM32_OTG_DOEPCTL(ep))
+# define AW_USB_SET_DOEPCTL(ep,value) stm32_putreg((value), STM32_OTG_DOEPCTL(ep))
+# define AW_USB_SET_DFIFO_DEP(ep,value) stm32_putreg((value), STM32_OTG_DFIFO_DEP(ep))
+# define AW_USB_GET_DIEPTSIZ(ep) stm32_getreg(STM32_OTG_DIEPTSIZ(ep))
+# define AW_USB_SET_DIEPTSIZ(ep,value) stm32_putreg((value), STM32_OTG_DIEPTSIZ(ep))
+# define AW_USB_GET_DSTS() stm32_getreg(STM32_OTG_DSTS)
+# define AW_USB_GET_DTXFSTS(ep) stm32_getreg(STM32_OTG_DTXFSTS(ep))
+# define AW_USB_GET_DIEPEMPMSK() stm32_getreg(STM32_OTG_DIEPEMPMSK)
+# define AW_USB_SET_DIEPEMPMSK(value) stm32_putreg((value), STM32_OTG_DIEPEMPMSK)
+# define AW_USB_SET_DIEPTXF(ep,value) stm32_putreg((value), STM32_OTG_DIEPTXF(ep))
+# define AW_USB_GET_DFIFO_DEP(ep) stm32_getreg(STM32_OTG_DFIFO_DEP(ep))
+# define AW_USB_GET_DOEPTSIZ(ep) stm32_getreg(STM32_OTG_DOEPTSIZ(ep))
+# define AW_USB_SET_DIEPINT(ep,value) stm32_putreg((value), STM32_OTG_DIEPINT(ep))
+# define AW_USB_SET_DOEPINT(ep,value) stm32_putreg((value), STM32_OTG_DOEPINT(ep))
+# define AW_USB_SET_DAINT(value) stm32_putreg((value), STM32_OTG_DAINT)
+# define AW_USB_SET_DAINTMSK(value) stm32_putreg((value), STM32_OTG_DAINTMSK)
+# define AW_USB_SET_DOEPMSK(value) stm32_putreg((value), STM32_OTG_DOEPMSK)
+# define AW_USB_SET_DIEPMSK(value) stm32_putreg((value), STM32_OTG_DIEPMSK)
+# define AW_USB_GET_DAINT() stm32_getreg(STM32_OTG_DAINT)
+# define AW_USB_GET_DAINTMSK() stm32_getreg(STM32_OTG_DAINTMSK)
+# define AW_USB_GET_DOEPINT(ep) stm32_getreg(STM32_OTG_DOEPINT(ep))
+# define AW_USB_GET_DOEPMSK() stm32_getreg(STM32_OTG_DOEPMSK)
+# define AW_USB_GET_DIEPINT(ep) stm32_getreg(STM32_OTG_DIEPINT(ep))
+# define AW_USB_GET_DIEPMSK() stm32_getreg(STM32_OTG_DIEPMSK)
+# define AW_USB_GET_PCGCCTL() stm32_getreg(STM32_OTG_PCGCCTL)
+# define AW_USB_SET_PCGCCTL(value) stm32_putreg((value), STM32_OTG_PCGCCTL)
+# define AW_USB_GET_GRXSTSP() stm32_getreg(STM32_OTG_GRXSTSP)
+# define AW_USB_GET_GUSBCFG() stm32_getreg(STM32_OTG_GUSBCFG)
+# define AW_USB_SET_GUSBCFG(value) stm32_putreg((value), STM32_OTG_GUSBCFG)
+# define AW_USB_GET_GOTGINT() stm32_getreg(STM32_OTG_GOTGINT)
+# define AW_USB_SET_GOTGINT(value) stm32_putreg((value), STM32_OTG_GOTGINT)
+# define AW_USB_GET_GINTSTS() stm32_getreg(STM32_OTG_GINTSTS)
+# define AW_USB_GET_GINTMSK() stm32_getreg(STM32_OTG_GINTMSK)
+# define AW_USB_SET_GINTSTS(value) stm32_putreg((value), STM32_OTG_GINTSTS)
+# define AW_USB_GET_BIDIR(ep,isin) stm32_getreg(((isin) ? STM32_OTG_DIEPCTL(ep) : STM32_OTG_DOEPCTL(ep)))
+# define AW_USB_SET_BIDIR(ep,isin,value) stm32_putreg((value), ((isin) ? STM32_OTG_DIEPCTL(ep) : STM32_OTG_DOEPCTL(ep)))
+# define AW_USB_GET_DCFG() stm32_getreg(STM32_OTG_DCFG)
+# define AW_USB_SET_DCFG(value) stm32_putreg((value), STM32_OTG_DCFG)
+# define AW_USB_SET_GRSTCTL(value) stm32_putreg((value), STM32_OTG_GRSTCTL)
+# define AW_USB_GET_GRSTCTL() stm32_getreg(STM32_OTG_GRSTCTL)
+# define AW_USB_SET_GAHBCFG(value) stm32_putreg((value), STM32_OTG_GAHBCFG)
+# define AW_USB_GET_GCCFG() stm32_getreg(STM32_OTG_GCCFG)
+# define AW_USB_SET_GCCFG(value) stm32_putreg((value), STM32_OTG_GCCFG)
+# define AW_USB_GET_GOTGCTL() stm32_getreg(STM32_OTG_GOTGCTL)
+# define AW_USB_SET_GOTGCTL(value) stm32_putreg((value), STM32_OTG_GOTGCTL)
+# define AW_USB_SET_GRXFSIZ(value) stm32_putreg((value), STM32_OTG_GRXFSIZ)
+# define AW_USB_SET_TXFIFO0(value) stm32_putreg((value), STM32_OTG_DIEPTXF0)
+# define AW_USB_SET_GINTMSK(value) stm32_putreg((value), STM32_OTG_GINTMSK)
+# define AW_USB_GET_POWER() stm32_getreg(STM32_PWR_CR3)
+# define AW_USB_SET_POWER(value) stm32_putreg((value), STM32_PWR_CR3)
+#endif
 #define OTG_GINT_RC_W1   (OTG_GINT_MMIS     | \
                           OTG_GINT_SOF      | \
                           OTG_GINT_ESUSP    | \
@@ -1049,18 +1171,18 @@ static void stm32_ep0in_activate(void)
 
   /* Set the max packet size  of the IN EP. */
 
-  regval  = stm32_getreg(STM32_OTG_DIEPCTL(0));
+  regval  = AW_USB_GET_DIEPCTL(0);
   regval &= ~OTG_DIEPCTL_MPSIZ_MASK;
 
   regval |= (CONFIG_USBDEV_EP0_MAXSIZE & OTG_DIEPCTL_MPSIZ_MASK);
 
-  stm32_putreg(regval, STM32_OTG_DIEPCTL(0));
+  AW_USB_SET_DIEPCTL(0, regval);
 
   /* Clear global IN NAK */
 
-  regval  = stm32_getreg(STM32_OTG_DCTL);
+  regval  = AW_USB_GET_DCTL();
   regval |= OTG_DCTL_CGINAK;
-  stm32_putreg(regval, STM32_OTG_DCTL);
+  AW_USB_SET_DCTL(regval);
 }
 
 /****************************************************************************
@@ -1080,13 +1202,13 @@ static void stm32_ep0out_ctrlsetup(struct stm32_usbdev_s *priv)
   regval = (USB_SIZEOF_CTRLREQ * 3 << OTG_DOEPTSIZ0_XFRSIZ_SHIFT) |
            (OTG_DOEPTSIZ0_PKTCNT) |
            (3 << OTG_DOEPTSIZ0_STUPCNT_SHIFT);
-  stm32_putreg(regval, STM32_OTG_DOEPTSIZ(0));
+  AW_USB_SET_DOEPTSIZ(0, regval);
 
   /* Then clear NAKing and enable the transfer */
 
-  regval  = stm32_getreg(STM32_OTG_DOEPCTL(0));
+  regval  = AW_USB_GET_DOEPCTL(0);
   regval |= (OTG_DOEPCTL0_CNAK | OTG_DOEPCTL0_EPENA);
-  stm32_putreg(regval, STM32_OTG_DOEPCTL(0));
+  AW_USB_SET_DOEPCTL(0, regval);
 }
 
 /****************************************************************************
@@ -1100,7 +1222,7 @@ static void stm32_ep0out_ctrlsetup(struct stm32_usbdev_s *priv)
 static void stm32_txfifo_write(struct stm32_ep_s *privep,
                                uint8_t *buf, int nbytes)
 {
-  uint32_t regaddr;
+  uint32_t regaddr __attribute__((unused));
   uint32_t regval;
   int nwords;
   int i;
@@ -1128,7 +1250,7 @@ static void stm32_txfifo_write(struct stm32_ep_s *privep,
 
       /* Then write the packet data to the TxFIFO */
 
-      stm32_putreg(regval, regaddr);
+      AW_USB_SET_DFIFO_DEP(privep->epphy, regval);
     }
 }
 
@@ -1148,7 +1270,7 @@ static void stm32_epin_transfer(struct stm32_ep_s *privep,
 
   /* Read the DIEPSIZx register */
 
-  regval = stm32_getreg(STM32_OTG_DIEPTSIZ(privep->epphy));
+  regval = AW_USB_GET_DIEPTSIZ(privep->epphy);
 
   /* Clear the XFRSIZ, PKTCNT, and MCNT field of the DIEPSIZx register */
 
@@ -1195,11 +1317,11 @@ static void stm32_epin_transfer(struct stm32_ep_s *privep,
 
   /* Save DIEPSIZx register value */
 
-  stm32_putreg(regval, STM32_OTG_DIEPTSIZ(privep->epphy));
+  AW_USB_SET_DIEPTSIZ(privep->epphy, regval);
 
   /* Read the DIEPCTLx register */
 
-  regval = stm32_getreg(STM32_OTG_DIEPCTL(privep->epphy));
+  regval = AW_USB_GET_DIEPCTL(privep->epphy);
 
   /* If this is an isochronous endpoint, then set the even/odd frame bit
    * the DIEPCTLx register.
@@ -1211,7 +1333,7 @@ static void stm32_epin_transfer(struct stm32_ep_s *privep,
        * even/odd frame to match.
        */
 
-      uint32_t status = stm32_getreg(STM32_OTG_DSTS);
+      uint32_t status = AW_USB_GET_DSTS();
       if ((status & OTG_DSTS_SOFFN0) == OTG_DSTS_SOFFN_EVEN)
         {
           regval |= OTG_DIEPCTL_SEVNFRM;
@@ -1226,7 +1348,7 @@ static void stm32_epin_transfer(struct stm32_ep_s *privep,
 
   regval &= ~OTG_DIEPCTL_EPDIS;
   regval |= (OTG_DIEPCTL_CNAK | OTG_DIEPCTL_EPENA);
-  stm32_putreg(regval, STM32_OTG_DIEPCTL(privep->epphy));
+  AW_USB_SET_DIEPCTL(privep->epphy, regval);
 
   /* Transfer the data to the TxFIFO.  At this point, the caller has already
    * assured that there is sufficient space in the TxFIFO to hold the
@@ -1248,7 +1370,7 @@ static void stm32_epin_request(struct stm32_usbdev_s *priv,
                                struct stm32_ep_s *privep)
 {
   struct stm32_req_s *privreq;
-  uint32_t regaddr;
+  uint32_t regaddr __attribute__((unused));
   uint32_t regval;
   uint8_t *buf;
   int nbytes;
@@ -1287,9 +1409,9 @@ static void stm32_epin_request(struct stm32_usbdev_s *priv,
        */
 
       regaddr = STM32_OTG_DIEPCTL(privep->epphy);
-      regval  = stm32_getreg(regaddr);
+      regval  = AW_USB_GET_DIEPCTL(privep->epphy);
       regval |= OTG_DIEPCTL_SNAK;
-      stm32_putreg(regval, regaddr);
+      AW_USB_SET_DIEPCTL(privep->epphy, regval);
 
       /* The endpoint is no longer active */
 
@@ -1396,7 +1518,7 @@ static void stm32_epin_request(struct stm32_usbdev_s *priv,
        * the TxFIFO is empty.
        */
 
-      regval = stm32_getreg(regaddr);
+      regval = AW_USB_GET_DTXFSTS(privep->epphy);
       if ((int)(regval & OTG_DTXFSTS_MASK) < nwords)
         {
           usbtrace(TRACE_INTDECODE(STM32_TRACEINTID_EPIN_EMPWAIT),
@@ -1406,16 +1528,21 @@ static void stm32_epin_request(struct stm32_usbdev_s *priv,
            * empty interrupt and try again.
            */
 
-          uint32_t empmsk = stm32_getreg(STM32_OTG_DIEPEMPMSK);
+          uint32_t empmsk = AW_USB_GET_DIEPEMPMSK();
           empmsk |= OTG_DIEPEMPMSK(privep->epphy);
-          stm32_putreg(empmsk, STM32_OTG_DIEPEMPMSK);
+          AW_USB_SET_DIEPEMPMSK(empmsk);
 
 #ifdef CONFIG_DEBUG_FEATURES
           /* Check if the configured TXFIFO size is sufficient for a given
            * request. If not, raise an assertion here.
            */
 
-          regval = stm32_putreg(regval, STM32_OTG_DIEPTXF(privep->epphy));
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+          /* The admitted layout fixes every IN FIFO to 73 words. */
+          regval = 73u << OTG_DIEPTXF_INEPTXFD_SHIFT;
+#else
+          regval = stm32_getreg(STM32_OTG_DIEPTXF(privep->epphy));
+#endif
           regval &= OTG_DIEPTXF_INEPTXFD_MASK;
           regval >>= OTG_DIEPTXF_INEPTXFD_SHIFT;
           uerr("EP%" PRId8 " TXLEN=%" PRId32 " nwords=%d\n",
@@ -1482,7 +1609,7 @@ static void stm32_epin_request(struct stm32_usbdev_s *priv,
 static void stm32_rxfifo_read(struct stm32_ep_s *privep,
                               uint8_t *dest, uint16_t len)
 {
-  uint32_t regaddr;
+  uint32_t regaddr __attribute__((unused));
   int i;
 
   /* Get the address of the RxFIFO.  Note:  there is only one RxFIFO so
@@ -1505,7 +1632,7 @@ static void stm32_rxfifo_read(struct stm32_ep_s *privep,
 
       /* Read 1 x 32-bits of EP0 packet data */
 
-      data.w = stm32_getreg(regaddr);
+      data.w = AW_USB_GET_DFIFO_DEP(EP0);
 
       /* Write 4 x 8-bits of EP0 packet data */
 
@@ -1528,7 +1655,7 @@ static void stm32_rxfifo_discard(struct stm32_ep_s *privep, int len)
 {
   if (len > 0)
     {
-      uint32_t regaddr;
+      uint32_t regaddr __attribute__((unused));
       int i;
 
       /* Get the address of the RxFIFO  Note:  there is only one RxFIFO so
@@ -1541,7 +1668,7 @@ static void stm32_rxfifo_discard(struct stm32_ep_s *privep, int len)
 
       for (i = 0; i < len; i += 4)
         {
-          volatile uint32_t data = stm32_getreg(regaddr);
+          volatile uint32_t data = AW_USB_GET_DFIFO_DEP(EP0);
           UNUSED(data);
         }
     }
@@ -1757,7 +1884,7 @@ static void stm32_epout_request(struct stm32_usbdev_s *priv,
                                 struct stm32_ep_s *privep)
 {
   struct stm32_req_s *privreq;
-  uint32_t regaddr;
+  uint32_t regaddr __attribute__((unused));
   uint32_t regval;
   uint32_t xfrsize;
   uint32_t pktcnt;
@@ -1793,9 +1920,9 @@ static void stm32_epout_request(struct stm32_usbdev_s *priv,
                */
 
               regaddr = STM32_OTG_DOEPCTL(privep->epphy);
-              regval  = stm32_getreg(regaddr);
+              regval  = AW_USB_GET_DOEPCTL(privep->epphy);
               regval |= OTG_DOEPCTL_SNAK;
-              stm32_putreg(regval, regaddr);
+              AW_USB_SET_DOEPCTL(privep->epphy, regval);
 
               /* This endpoint is no longer actively transferring */
 
@@ -1840,16 +1967,16 @@ static void stm32_epout_request(struct stm32_usbdev_s *priv,
       /* Then setup the hardware to perform this transfer */
 
       regaddr = STM32_OTG_DOEPTSIZ(privep->epphy);
-      regval  = stm32_getreg(regaddr);
+      regval  = AW_USB_GET_DOEPTSIZ(privep->epphy);
       regval &= ~(OTG_DOEPTSIZ_XFRSIZ_MASK | OTG_DOEPTSIZ_PKTCNT_MASK);
       regval |= (xfrsize << OTG_DOEPTSIZ_XFRSIZ_SHIFT);
       regval |= (pktcnt  << OTG_DOEPTSIZ_PKTCNT_SHIFT);
-      stm32_putreg(regval, regaddr);
+      AW_USB_SET_DOEPTSIZ(privep->epphy, regval);
 
       /* Then enable the transfer */
 
       regaddr = STM32_OTG_DOEPCTL(privep->epphy);
-      regval  = stm32_getreg(regaddr);
+      regval  = AW_USB_GET_DOEPCTL(privep->epphy);
 
       /* When an isochronous transfer is enabled the Even/Odd frame bit must
        * also be set appropriately.
@@ -1872,7 +1999,7 @@ static void stm32_epout_request(struct stm32_usbdev_s *priv,
       /* Clearing NAKing and enable the transfer. */
 
       regval |= (OTG_DOEPCTL_CNAK | OTG_DOEPCTL_EPENA);
-      stm32_putreg(regval, regaddr);
+      AW_USB_SET_DOEPCTL(privep->epphy, regval);
 
       /* A transfer is now active on this endpoint */
 
@@ -2060,9 +2187,9 @@ static void stm32_usbreset(struct stm32_usbdev_s *priv)
 
   /* Clear the Remote Wake-up Signaling */
 
-  regval = stm32_getreg(STM32_OTG_DCTL);
+  regval = AW_USB_GET_DCTL();
   regval &= ~OTG_DCTL_RWUSIG;
-  stm32_putreg(regval, STM32_OTG_DCTL);
+  AW_USB_SET_DCTL(regval);
 
   /* Flush the EP0 Tx FIFO */
 
@@ -2088,8 +2215,8 @@ static void stm32_usbreset(struct stm32_usbdev_s *priv)
     {
       /* Disable endpoint interrupts */
 
-      stm32_putreg(0xff, STM32_OTG_DIEPINT(i));
-      stm32_putreg(0xff, STM32_OTG_DOEPINT(i));
+      AW_USB_SET_DIEPINT(i, 0xff);
+      AW_USB_SET_DOEPINT(i, 0xff);
 
       /* Return write requests to the class implementation */
 
@@ -2114,22 +2241,22 @@ static void stm32_usbreset(struct stm32_usbdev_s *priv)
       privep->zlp     = false;
     }
 
-  stm32_putreg(0xffffffff, STM32_OTG_DAINT);
+  AW_USB_SET_DAINT(0xffffffff);
 
   /* Mask all device endpoint interrupts except EP0 */
 
   regval = (OTG_DAINT_IEP(EP0) | OTG_DAINT_OEP(EP0));
-  stm32_putreg(regval, STM32_OTG_DAINTMSK);
+  AW_USB_SET_DAINTMSK(regval);
 
   /* Unmask OUT interrupts */
 
   regval = (OTG_DOEPMSK_XFRCM | OTG_DOEPMSK_STUPM | OTG_DOEPMSK_EPDM);
-  stm32_putreg(regval, STM32_OTG_DOEPMSK);
+  AW_USB_SET_DOEPMSK(regval);
 
   /* Unmask IN interrupts */
 
   regval = (OTG_DIEPMSK_XFRCM | OTG_DIEPMSK_EPDM | OTG_DIEPMSK_TOM);
-  stm32_putreg(regval, STM32_OTG_DIEPMSK);
+  AW_USB_SET_DIEPMSK(regval);
 
   /* Reset device address to 0 */
 
@@ -2161,6 +2288,14 @@ static void stm32_usbreset(struct stm32_usbdev_s *priv)
 static inline void stm32_ep0out_testmode(struct stm32_usbdev_s *priv,
                                          uint16_t index)
 {
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  /* The fixed FS CDC profile does not enter electrical compliance modes. */
+  UNUSED(index);
+  priv->dotest = false;
+  priv->testmode = OTG_TESTMODE_DISABLED;
+  priv->stalled = true;
+#else
+
   uint8_t testmode;
 
   testmode = index >> 8;
@@ -2195,6 +2330,7 @@ static inline void stm32_ep0out_testmode(struct stm32_usbdev_s *priv,
 
   priv->dotest = true;
   stm32_ep0in_transmitzlp(priv);
+#endif
 }
 
 /****************************************************************************
@@ -2732,8 +2868,8 @@ static inline void stm32_epout_interrupt(struct stm32_usbdev_s *priv)
    * endpoint interrupt status register.
    */
 
-  regval  = stm32_getreg(STM32_OTG_DAINT);
-  regval &= stm32_getreg(STM32_OTG_DAINTMSK);
+  regval  = AW_USB_GET_DAINT();
+  regval &= AW_USB_GET_DAINTMSK();
   daint   = (regval & OTG_DAINT_OEP_MASK) >> OTG_DAINT_OEP_SHIFT;
 
   if (daint == 0)
@@ -2748,7 +2884,7 @@ static inline void stm32_epout_interrupt(struct stm32_usbdev_s *priv)
        * works by clearing each endpoint flags, masked or not.
        */
 
-      regval  = stm32_getreg(STM32_OTG_DAINT);
+      regval  = AW_USB_GET_DAINT();
       daint   = (regval & OTG_DAINT_OEP_MASK) >> OTG_DAINT_OEP_SHIFT;
 
       usbtrace(TRACE_DEVERROR(STM32_TRACEERR_EPOUTUNEXPECTED),
@@ -2759,9 +2895,9 @@ static inline void stm32_epout_interrupt(struct stm32_usbdev_s *priv)
         {
           if ((daint & 1) != 0)
             {
-              regval = stm32_getreg(STM32_OTG_DOEPINT(epno));
+              regval = AW_USB_GET_DOEPINT(epno);
               uerr("DOEPINT(%d) = %08" PRIx32 "\n", epno, regval);
-              stm32_putreg(0xff, STM32_OTG_DOEPINT(epno));
+              AW_USB_SET_DOEPINT(epno, 0xff);
             }
 
           epno++;
@@ -2782,8 +2918,8 @@ static inline void stm32_epout_interrupt(struct stm32_usbdev_s *priv)
         {
           /* Yes.. get the OUT endpoint interrupt status */
 
-          doepint  = stm32_getreg(STM32_OTG_DOEPINT(epno));
-          doepint &= stm32_getreg(STM32_OTG_DOEPMSK);
+          doepint  = AW_USB_GET_DOEPINT(epno);
+          doepint &= AW_USB_GET_DOEPMSK();
 
           /* Transfer completed interrupt.  This interrupt is triggered when
            * stm32_rxinterrupt() removes the last packet data from the
@@ -2798,7 +2934,7 @@ static inline void stm32_epout_interrupt(struct stm32_usbdev_s *priv)
 
               /* Clear the bit in DOEPINTn for this interrupt */
 
-              stm32_putreg(OTG_DOEPINT_XFRC, STM32_OTG_DOEPINT(epno));
+              AW_USB_SET_DOEPINT(epno, OTG_DOEPINT_XFRC);
 
               /* Handle the RX transfer data ready event */
 
@@ -2818,7 +2954,7 @@ static inline void stm32_epout_interrupt(struct stm32_usbdev_s *priv)
 
               /* Clear the bit in DOEPINTn for this interrupt */
 
-              stm32_putreg(OTG_DOEPINT_EPDISD, STM32_OTG_DOEPINT(epno));
+              AW_USB_SET_DOEPINT(epno, OTG_DOEPINT_EPDISD);
             }
 #endif
 
@@ -2839,8 +2975,7 @@ static inline void stm32_epout_interrupt(struct stm32_usbdev_s *priv)
                   stm32_ep0out_setup(priv);
                 }
 
-              stm32_putreg(OTG_DOEPINT_SETUP,
-                           STM32_OTG_DOEPINT(epno));
+              AW_USB_SET_DOEPINT(epno, OTG_DOEPINT_SETUP);
             }
         }
 
@@ -2859,10 +2994,10 @@ static inline void stm32_epout_interrupt(struct stm32_usbdev_s *priv)
 
 static inline void stm32_epin_runtestmode(struct stm32_usbdev_s *priv)
 {
-  uint32_t regval = stm32_getreg(STM32_OTG_DCTL);
+  uint32_t regval = AW_USB_GET_DCTL();
   regval &= OTG_DCTL_TCTL_MASK;
   regval |= (uint32_t)priv->testmode << OTG_DCTL_TCTL_SHIFT;
-  stm32_putreg(regval , STM32_OTG_DCTL);
+  AW_USB_SET_DCTL(regval);
 
   priv->dotest = 0;
   priv->testmode = OTG_TESTMODE_DISABLED;
@@ -2972,8 +3107,8 @@ static inline void stm32_epin_interrupt(struct stm32_usbdev_s *priv)
    * endpoint interrupt status register.
    */
 
-  daint  = stm32_getreg(STM32_OTG_DAINT);
-  daint &= stm32_getreg(STM32_OTG_DAINTMSK);
+  daint  = AW_USB_GET_DAINT();
+  daint &= AW_USB_GET_DAINTMSK();
   daint &= OTG_DAINT_IEP_MASK;
 
   if (daint == 0)
@@ -2988,7 +3123,7 @@ static inline void stm32_epin_interrupt(struct stm32_usbdev_s *priv)
        * works by clearing each endpoint flags, masked or not.
        */
 
-      daint  = stm32_getreg(STM32_OTG_DAINT);
+      daint  = AW_USB_GET_DAINT();
       usbtrace(TRACE_DEVERROR(STM32_TRACEERR_EPINUNEXPECTED),
                (uint16_t)daint);
 
@@ -3000,8 +3135,8 @@ static inline void stm32_epin_interrupt(struct stm32_usbdev_s *priv)
           if ((daint & 1) != 0)
             {
               uerr("DIEPINT(%d) = %08" PRIx32 "\n",
-                     epno, stm32_getreg(STM32_OTG_DIEPINT(epno)));
-              stm32_putreg(0xff, STM32_OTG_DIEPINT(epno));
+                     epno, AW_USB_GET_DIEPINT(epno));
+              AW_USB_SET_DIEPINT(epno, 0xff);
             }
 
           epno++;
@@ -3025,7 +3160,7 @@ static inline void stm32_epin_interrupt(struct stm32_usbdev_s *priv)
            * register.
            */
 
-          mask = stm32_getreg(STM32_OTG_DIEPMSK);
+          mask = AW_USB_GET_DIEPMSK();
 
           /* Check if the TxFIFO not empty interrupt is enabled for this
            * endpoint in the DIEPMSK register.  Bits n corresponds to
@@ -3034,7 +3169,7 @@ static inline void stm32_epin_interrupt(struct stm32_usbdev_s *priv)
            * no TXFE bit in the mask register, so we fake one here.
            */
 
-          empty = stm32_getreg(STM32_OTG_DIEPEMPMSK);
+          empty = AW_USB_GET_DIEPEMPMSK();
           if ((empty & OTG_DIEPEMPMSK(epno)) != 0)
             {
               mask |= OTG_DIEPINT_TXFE;
@@ -3044,7 +3179,7 @@ static inline void stm32_epin_interrupt(struct stm32_usbdev_s *priv)
            * interrupts.
            */
 
-          diepint = stm32_getreg(STM32_OTG_DIEPINT(epno)) & mask;
+          diepint = AW_USB_GET_DIEPINT(epno) & mask;
 
           /* Decode and process the enabled, pending interrupts */
 
@@ -3062,8 +3197,8 @@ static inline void stm32_epin_interrupt(struct stm32_usbdev_s *priv)
                */
 
               empty &= ~OTG_DIEPEMPMSK(epno);
-              stm32_putreg(empty, STM32_OTG_DIEPEMPMSK);
-              stm32_putreg(OTG_DIEPINT_XFRC, STM32_OTG_DIEPINT(epno));
+              AW_USB_SET_DIEPEMPMSK(empty);
+              AW_USB_SET_DIEPINT(epno, OTG_DIEPINT_XFRC);
 
               /* IN transfer complete */
 
@@ -3076,7 +3211,7 @@ static inline void stm32_epin_interrupt(struct stm32_usbdev_s *priv)
             {
               usbtrace(TRACE_INTDECODE(STM32_TRACEINTID_EPIN_TOC),
                       (uint16_t)diepint);
-              stm32_putreg(OTG_DIEPINT_TOC, STM32_OTG_DIEPINT(epno));
+              AW_USB_SET_DIEPINT(epno, OTG_DIEPINT_TOC);
             }
 
           /* IN token received when TxFIFO is empty.  Applies to non-periodic
@@ -3091,7 +3226,7 @@ static inline void stm32_epin_interrupt(struct stm32_usbdev_s *priv)
               usbtrace(TRACE_INTDECODE(STM32_TRACEINTID_EPIN_ITTXFE),
                       (uint16_t)diepint);
               stm32_epin_request(priv, &priv->epin[epno]);
-              stm32_putreg(OTG_DIEPINT_ITTXFE, STM32_OTG_DIEPINT(epno));
+              AW_USB_SET_DIEPINT(epno, OTG_DIEPINT_ITTXFE);
             }
 
           /* IN endpoint NAK effective (ignored as this used only in polled
@@ -3102,7 +3237,7 @@ static inline void stm32_epin_interrupt(struct stm32_usbdev_s *priv)
             {
               usbtrace(TRACE_INTDECODE(STM32_TRACEINTID_EPIN_INEPNE),
                       (uint16_t)diepint);
-              stm32_putreg(OTG_DIEPINT_INEPNE, STM32_OTG_DIEPINT(epno));
+              AW_USB_SET_DIEPINT(epno, OTG_DIEPINT_INEPNE);
             }
 #endif
 
@@ -3114,7 +3249,7 @@ static inline void stm32_epin_interrupt(struct stm32_usbdev_s *priv)
             {
               usbtrace(TRACE_INTDECODE(STM32_TRACEINTID_EPIN_EPDISD),
                       (uint16_t)diepint);
-              stm32_putreg(OTG_DIEPINT_EPDISD, STM32_OTG_DIEPINT(epno));
+              AW_USB_SET_DIEPINT(epno, OTG_DIEPINT_EPDISD);
             }
 #endif
 
@@ -3139,7 +3274,7 @@ static inline void stm32_epin_interrupt(struct stm32_usbdev_s *priv)
                    */
 
                   empty &= ~OTG_DIEPEMPMSK(epno);
-                  stm32_putreg(empty, STM32_OTG_DIEPEMPMSK);
+                  AW_USB_SET_DIEPEMPMSK(empty);
 
                   /* Handle TxFIFO empty */
 
@@ -3148,7 +3283,7 @@ static inline void stm32_epin_interrupt(struct stm32_usbdev_s *priv)
 
               /* Clear the pending TxFIFO empty interrupt */
 
-              stm32_putreg(OTG_DIEPINT_TXFE, STM32_OTG_DIEPINT(epno));
+              AW_USB_SET_DIEPINT(epno, OTG_DIEPINT_TXFE);
             }
         }
 
@@ -3172,16 +3307,16 @@ static inline void stm32_resumeinterrupt(struct stm32_usbdev_s *priv)
   /* Restart the PHY clock and un-gate USB core clock (HCLK) */
 
 #ifdef CONFIG_USBDEV_LOWPOWER
-  regval = stm32_getreg(STM32_OTG_PCGCCTL);
+  regval = AW_USB_GET_PCGCCTL();
   regval &= ~(OTG_PCGCCTL_STPPCLK | OTG_PCGCCTL_GATEHCLK);
-  stm32_putreg(regval, STM32_OTG_PCGCCTL);
+  AW_USB_SET_PCGCCTL(regval);
 #endif
 
   /* Clear remote wake-up signaling */
 
-  regval  = stm32_getreg(STM32_OTG_DCTL);
+  regval  = AW_USB_GET_DCTL();
   regval &= ~OTG_DCTL_RWUSIG;
-  stm32_putreg(regval, STM32_OTG_DCTL);
+  AW_USB_SET_DCTL(regval);
 
   /* Restore full power -- whatever that means for this particular board */
 
@@ -3222,7 +3357,7 @@ static inline void stm32_suspendinterrupt(struct stm32_usbdev_s *priv)
    * connected to the host, and that we have been configured.
    */
 
-  regval = stm32_getreg(STM32_OTG_DSTS);
+  regval = AW_USB_GET_DSTS();
 
   if ((regval & OTG_DSTS_SUSPSTS) != 0 && devstate == DEVSTATE_CONFIGURED)
     {
@@ -3230,16 +3365,16 @@ static inline void stm32_suspendinterrupt(struct stm32_usbdev_s *priv)
        * PHY clock.
        */
 
-      regval = stm32_getreg(STM32_OTG_PCGCCTL);
+      regval = AW_USB_GET_PCGCCTL();
       regval |= OTG_PCGCCTL_STPPCLK;
-      stm32_putreg(regval, STM32_OTG_PCGCCTL);
+      AW_USB_SET_PCGCCTL(regval);
 
       /* Setting OTG_PCGCCTL_GATEHCLK gate HCLK to modules other than
        * the AHB Slave and Master and wakeup logic.
        */
 
       regval |= OTG_PCGCCTL_GATEHCLK;
-      stm32_putreg(regval, STM32_OTG_PCGCCTL);
+      AW_USB_SET_PCGCCTL(regval);
     }
 #endif
 
@@ -3268,7 +3403,7 @@ static inline void stm32_rxinterrupt(struct stm32_usbdev_s *priv)
 
   /* Get the status from the top of the FIFO */
 
-  regval = stm32_getreg(STM32_OTG_GRXSTSP);
+  regval = AW_USB_GET_GRXSTSP();
 
   /* Decode status fields */
 
@@ -3355,9 +3490,9 @@ static inline void stm32_rxinterrupt(struct stm32_usbdev_s *priv)
               {
                 /* Clear NAKSTS so that we can receive the data */
 
-                regval  = stm32_getreg(STM32_OTG_DOEPCTL(0));
+                regval  = AW_USB_GET_DOEPCTL(0);
                 regval |= OTG_DOEPCTL0_CNAK;
-                stm32_putreg(regval, STM32_OTG_DOEPCTL(0));
+                AW_USB_SET_DOEPCTL(0, regval);
             }
           }
           break;
@@ -3441,14 +3576,14 @@ static inline void stm32_enuminterrupt(struct stm32_usbdev_s *priv)
    * PHY interface.
    */
 
-  regval  = stm32_getreg(STM32_OTG_GUSBCFG);
+  regval  = AW_USB_GET_GUSBCFG();
   regval &= ~OTG_GUSBCFG_TRDT_MASK;
 #ifdef CONFIG_STM32H7_OTGHS
   regval |=  OTG_GUSBCFG_TRDT(9);
 #else
   regval |=  OTG_GUSBCFG_TRDT(6);
 #endif
-  stm32_putreg(regval, STM32_OTG_GUSBCFG);
+  AW_USB_SET_GUSBCFG(regval);
 }
 
 /****************************************************************************
@@ -3495,8 +3630,8 @@ static inline void stm32_isocininterrupt(struct stm32_usbdev_s *priv)
       /* Check if this is the endpoint that had the incomplete transfer */
 
       regaddr = STM32_OTG_DIEPCTL(privep->epphy);
-      doepctl = stm32_getreg(regaddr);
-      dsts    = stm32_getreg(STM32_OTG_DSTS);
+      doepctl = AW_USB_GET_DIEPCTL(privep->epphy);
+      dsts    = AW_USB_GET_DSTS();
 
       /* EONUM = 0:even frame, 1:odd frame
        * SOFFN = Frame number of the received SOF
@@ -3538,7 +3673,7 @@ static inline void stm32_isocoutinterrupt(struct stm32_usbdev_s *priv)
 {
   struct stm32_ep_s *privep;
   struct stm32_req_s *privreq;
-  uint32_t regaddr;
+  uint32_t regaddr __attribute__((unused));
   uint32_t doepctl;
   uint32_t dsts;
   bool eonum;
@@ -3578,8 +3713,8 @@ static inline void stm32_isocoutinterrupt(struct stm32_usbdev_s *priv)
       /* Check if this is the endpoint that had the incomplete transfer */
 
       regaddr = STM32_OTG_DOEPCTL(privep->epphy);
-      doepctl = stm32_getreg(regaddr);
-      dsts    = stm32_getreg(STM32_OTG_DSTS);
+      doepctl = AW_USB_GET_DOEPCTL(privep->epphy);
+      dsts    = AW_USB_GET_DSTS();
 
       /* EONUM = 0:even frame, 1:odd frame
        * SOFFN = Frame number of the received SOF
@@ -3638,7 +3773,7 @@ static inline void stm32_otginterrupt(struct stm32_usbdev_s *priv)
 
   /* Check for session end detected */
 
-  regval = stm32_getreg(STM32_OTG_GOTGINT);
+  regval = AW_USB_GET_GOTGINT();
   if ((regval & OTG_GOTGINT_SEDET) != 0)
     {
 #warning "Missing logic"
@@ -3646,7 +3781,7 @@ static inline void stm32_otginterrupt(struct stm32_usbdev_s *priv)
 
   /* Clear OTG interrupt */
 
-  stm32_putreg(regval, STM32_OTG_GOTGINT);
+  AW_USB_SET_GOTGINT(regval);
 }
 #endif
 
@@ -3675,7 +3810,7 @@ static int stm32_usbinterrupt(int irq, void *context, void *arg)
 
   /* Assure that we are in device mode */
 
-  DEBUGASSERT((stm32_getreg(STM32_OTG_GINTSTS) & OTG_GINTSTS_CMOD) ==
+  DEBUGASSERT((AW_USB_GET_GINTSTS() & OTG_GINTSTS_CMOD) ==
                OTG_GINTSTS_DEVMODE);
 
   /* Get the state of all enabled interrupts.  We will do this repeatedly
@@ -3687,16 +3822,15 @@ static int stm32_usbinterrupt(int irq, void *context, void *arg)
     {
       /* Get the set of pending, un-masked interrupts */
 
-      regval  = stm32_getreg(STM32_OTG_GINTSTS);
+      regval  = AW_USB_GET_GINTSTS();
       reserved = (regval & OTG_GINT_RESERVED);
-      regval &= stm32_getreg(STM32_OTG_GINTMSK);
+      regval &= AW_USB_GET_GINTMSK();
 
       /* With out modifying the reserved bits, acknowledge all
        * **Writable** pending irqs we will service below
        */
 
-      stm32_putreg(((regval | reserved) & OTG_GINT_RC_W1),
-                     STM32_OTG_GINTSTS);
+      AW_USB_SET_GINTSTS(((regval | reserved) & OTG_GINT_RC_W1));
 
       /* Break out of the loop when there are no further pending (and
        * unmasked) interrupts to be processes.
@@ -3878,14 +4012,14 @@ static void stm32_enablegonak(struct stm32_ep_s *privep)
   /* First, make sure that there is no GNOAKEFF interrupt pending. */
 
 #if 0
-  stm32_putreg(OTG_GINT_GONAKEFF, STM32_OTG_GINTSTS);
+  AW_USB_SET_GINTSTS(OTG_GINT_GONAKEFF);
 #endif
 
   /* Enable Global OUT NAK mode in the core. */
 
-  regval = stm32_getreg(STM32_OTG_DCTL);
+  regval = AW_USB_GET_DCTL();
   regval |= OTG_DCTL_SGONAK;
-  stm32_putreg(regval, STM32_OTG_DCTL);
+  AW_USB_SET_DCTL(regval);
 
 #if 0
   /* Wait for the GONAKEFF interrupt that indicates that the OUT NAK
@@ -3893,8 +4027,8 @@ static void stm32_enablegonak(struct stm32_ep_s *privep)
    * from the RxFIFO, the core sets the GONAKEFF interrupt.
    */
 
-  while ((stm32_getreg(STM32_OTG_GINTSTS) & OTG_GINT_GONAKEFF) == 0);
-  stm32_putreg(OTG_GINT_GONAKEFF, STM32_OTG_GINTSTS);
+  while ((AW_USB_GET_GINTSTS() & OTG_GINT_GONAKEFF) == 0);
+  AW_USB_SET_GINTSTS(OTG_GINT_GONAKEFF);
 
 #else
   /* Since we are in the interrupt handler, we cannot wait inline for the
@@ -3905,7 +4039,7 @@ static void stm32_enablegonak(struct stm32_ep_s *privep)
    * reported in OTG DCTL register?
    */
 
-  while ((stm32_getreg(STM32_OTG_DCTL) & OTG_DCTL_GONSTS) == 0);
+  while ((AW_USB_GET_DCTL() & OTG_DCTL_GONSTS) == 0);
 #endif
 }
 
@@ -3923,9 +4057,9 @@ static void stm32_disablegonak(struct stm32_ep_s *privep)
 
   /* Set the "Clear the Global OUT NAK bit" to disable global OUT NAK mode */
 
-  regval  = stm32_getreg(STM32_OTG_DCTL);
+  regval  = AW_USB_GET_DCTL();
   regval |= OTG_DCTL_CGONAK;
-  stm32_putreg(regval, STM32_OTG_DCTL);
+  AW_USB_SET_DCTL(regval);
 }
 
 /****************************************************************************
@@ -3945,7 +4079,7 @@ static int stm32_epout_configure(struct stm32_ep_s *privep,
                                  uint8_t eptype, uint16_t maxpacket)
 {
   uint32_t mpsiz;
-  uint32_t regaddr;
+  uint32_t regaddr __attribute__((unused));
   uint32_t regval;
 
   usbtrace(TRACE_EPCONFIGURE, privep->epphy);
@@ -3971,7 +4105,7 @@ static int stm32_epout_configure(struct stm32_ep_s *privep,
    */
 
   regaddr = STM32_OTG_DOEPCTL(privep->epphy);
-  regval  = stm32_getreg(regaddr);
+  regval  = AW_USB_GET_DOEPCTL(privep->epphy);
   if ((regval & OTG_DOEPCTL_USBAEP) == 0)
     {
       if (regval & OTG_DOEPCTL_NAKSTS)
@@ -3983,7 +4117,7 @@ static int stm32_epout_configure(struct stm32_ep_s *privep,
       regval |= mpsiz;
       regval |= (eptype << OTG_DOEPCTL_EPTYP_SHIFT);
       regval |= (OTG_DOEPCTL_SD0PID | OTG_DOEPCTL_USBAEP);
-      stm32_putreg(regval, regaddr);
+      AW_USB_SET_DOEPCTL(privep->epphy, regval);
 
       /* Save the endpoint configuration */
 
@@ -3996,9 +4130,9 @@ static int stm32_epout_configure(struct stm32_ep_s *privep,
 
   /* Enable the interrupt for this endpoint */
 
-  regval = stm32_getreg(STM32_OTG_DAINTMSK);
+  regval = AW_USB_GET_DAINTMSK();
   regval |= OTG_DAINT_OEP(privep->epphy);
-  stm32_putreg(regval, STM32_OTG_DAINTMSK);
+  AW_USB_SET_DAINTMSK(regval);
   return OK;
 }
 
@@ -4019,7 +4153,7 @@ static int stm32_epin_configure(struct stm32_ep_s *privep,
                                 uint8_t eptype, uint16_t maxpacket)
 {
   uint32_t mpsiz;
-  uint32_t regaddr;
+  uint32_t regaddr __attribute__((unused));
   uint32_t regval;
 
   usbtrace(TRACE_EPCONFIGURE, privep->epphy);
@@ -4042,7 +4176,7 @@ static int stm32_epin_configure(struct stm32_ep_s *privep,
    */
 
   regaddr = STM32_OTG_DIEPCTL(privep->epphy);
-  regval  = stm32_getreg(regaddr);
+  regval  = AW_USB_GET_DIEPCTL(privep->epphy);
   if ((regval & OTG_DIEPCTL_USBAEP) == 0)
     {
       if (regval & OTG_DIEPCTL_NAKSTS)
@@ -4056,7 +4190,7 @@ static int stm32_epin_configure(struct stm32_ep_s *privep,
       regval |= (eptype << OTG_DIEPCTL_EPTYP_SHIFT);
       regval |= (privep->epphy << OTG_DIEPCTL_TXFNUM_SHIFT);
       regval |= (OTG_DIEPCTL_SD0PID | OTG_DIEPCTL_USBAEP);
-      stm32_putreg(regval, regaddr);
+      AW_USB_SET_DIEPCTL(privep->epphy, regval);
 
       /* Save the endpoint configuration */
 
@@ -4069,9 +4203,9 @@ static int stm32_epin_configure(struct stm32_ep_s *privep,
 
   /* Enable the interrupt for this endpoint */
 
-  regval = stm32_getreg(STM32_OTG_DAINTMSK);
+  regval = AW_USB_GET_DAINTMSK();
   regval |= OTG_DAINT_IEP(privep->epphy);
-  stm32_putreg(regval, STM32_OTG_DAINTMSK);
+  AW_USB_SET_DAINTMSK(regval);
 
   return OK;
 }
@@ -4150,7 +4284,7 @@ static void stm32_ep0_configure(struct stm32_usbdev_s *priv)
 
 static void stm32_epout_disable(struct stm32_ep_s *privep)
 {
-  uint32_t regaddr;
+  uint32_t regaddr __attribute__((unused));
   uint32_t regval;
   irqstate_t flags;
 
@@ -4170,10 +4304,10 @@ static void stm32_epout_disable(struct stm32_ep_s *privep)
    */
 
   regaddr = STM32_OTG_DOEPCTL(privep->epphy);
-  regval  = stm32_getreg(regaddr);
+  regval  = AW_USB_GET_DOEPCTL(privep->epphy);
   regval &= ~OTG_DOEPCTL_USBAEP;
   regval |= (OTG_DOEPCTL_EPDIS | OTG_DOEPCTL_SNAK);
-  stm32_putreg(regval, regaddr);
+  AW_USB_SET_DOEPCTL(privep->epphy, regval);
 
   /* Wait for the EPDISD interrupt which indicates that the OUT
    * endpoint is completely disabled.
@@ -4181,7 +4315,7 @@ static void stm32_epout_disable(struct stm32_ep_s *privep)
 
 #if 0 /* Doesn't happen */
   regaddr = STM32_OTG_DOEPINT(privep->epphy);
-  while ((stm32_getreg(regaddr) & OTG_DOEPINT_EPDISD) == 0);
+  while ((AW_USB_GET_DOEPINT(privep->epphy) & OTG_DOEPINT_EPDISD) == 0);
 #else
   /* REVISIT: */
 
@@ -4190,7 +4324,7 @@ static void stm32_epout_disable(struct stm32_ep_s *privep)
 
   /* Clear the EPDISD interrupt indication */
 
-  stm32_putreg(OTG_DOEPINT_EPDISD, STM32_OTG_DOEPINT(privep->epphy));
+  AW_USB_SET_DOEPINT(privep->epphy, OTG_DOEPINT_EPDISD);
 
   /* Then disable the Global OUT NAK mode to continue receiving data
    * from other non-disabled OUT endpoints.
@@ -4200,9 +4334,9 @@ static void stm32_epout_disable(struct stm32_ep_s *privep)
 
   /* Disable endpoint interrupts */
 
-  regval  = stm32_getreg(STM32_OTG_DAINTMSK);
+  regval  = AW_USB_GET_DAINTMSK();
   regval &= ~OTG_DAINT_OEP(privep->epphy);
-  stm32_putreg(regval, STM32_OTG_DAINTMSK);
+  AW_USB_SET_DAINTMSK(regval);
 
   /* Cancel any queued read requests */
 
@@ -4221,7 +4355,7 @@ static void stm32_epout_disable(struct stm32_ep_s *privep)
 
 static void stm32_epin_disable(struct stm32_ep_s *privep)
 {
-  uint32_t regaddr;
+  uint32_t regaddr __attribute__((unused));
   uint32_t regval;
   irqstate_t flags;
 
@@ -4232,7 +4366,7 @@ static void stm32_epin_disable(struct stm32_ep_s *privep)
    */
 
   regaddr = STM32_OTG_DIEPCTL(privep->epphy);
-  regval  = stm32_getreg(regaddr);
+  regval  = AW_USB_GET_DIEPCTL(privep->epphy);
   if ((regval & OTG_DIEPCTL_USBAEP) == 0)
     {
       return;
@@ -4247,26 +4381,26 @@ static void stm32_epin_disable(struct stm32_ep_s *privep)
    * to poll this bit below).
    */
 
-  stm32_putreg(OTG_DIEPINT_INEPNE, STM32_OTG_DIEPINT(privep->epphy));
+  AW_USB_SET_DIEPINT(privep->epphy, OTG_DIEPINT_INEPNE);
 
   /* Set the endpoint in NAK mode */
 
   regaddr = STM32_OTG_DIEPCTL(privep->epphy);
-  regval  = stm32_getreg(regaddr);
+  regval  = AW_USB_GET_DIEPCTL(privep->epphy);
   regval &= ~OTG_DIEPCTL_USBAEP;
   regval |= (OTG_DIEPCTL_EPDIS | OTG_DIEPCTL_SNAK);
-  stm32_putreg(regval, regaddr);
+  AW_USB_SET_DIEPCTL(privep->epphy, regval);
 
   /* Wait for the INEPNE interrupt that indicates that we are now in
    * NAK mode
    */
 
   regaddr = STM32_OTG_DIEPINT(privep->epphy);
-  while ((stm32_getreg(regaddr) & OTG_DIEPINT_INEPNE) == 0);
+  while ((AW_USB_GET_DIEPINT(privep->epphy) & OTG_DIEPINT_INEPNE) == 0);
 
   /* Clear the INEPNE interrupt indication */
 
-  stm32_putreg(OTG_DIEPINT_INEPNE, regaddr);
+  AW_USB_SET_DIEPINT(privep->epphy, OTG_DIEPINT_INEPNE);
 #endif
 
   /* Deactivate and disable the endpoint by setting the EPDIS and SNAK bits
@@ -4275,23 +4409,23 @@ static void stm32_epin_disable(struct stm32_ep_s *privep)
 
   flags = enter_critical_section();
   regaddr = STM32_OTG_DIEPCTL(privep->epphy);
-  regval  = stm32_getreg(regaddr);
+  regval  = AW_USB_GET_DIEPCTL(privep->epphy);
   regval &= ~OTG_DIEPCTL_USBAEP;
   regval |= (OTG_DIEPCTL_EPDIS | OTG_DIEPCTL_SNAK);
-  stm32_putreg(regval, regaddr);
+  AW_USB_SET_DIEPCTL(privep->epphy, regval);
 
   /* Wait for the EPDISD interrupt which indicates that the IN
    * endpoint is completely disabled.
    */
 
   regaddr = STM32_OTG_DIEPINT(privep->epphy);
-  while ((stm32_getreg(regaddr) & OTG_DIEPINT_EPDISD) == 0);
+  while ((AW_USB_GET_DIEPINT(privep->epphy) & OTG_DIEPINT_EPDISD) == 0);
 
   /* Clear the EPDISD interrupt indication */
 
-  regval = stm32_getreg(regaddr);
+  regval = AW_USB_GET_DIEPINT(privep->epphy);
   regval |= OTG_DIEPINT_EPDISD;
-  stm32_putreg(regval, regaddr);
+  AW_USB_SET_DIEPINT(privep->epphy, regval);
 
   /* Flush any data remaining in the TxFIFO */
 
@@ -4299,9 +4433,9 @@ static void stm32_epin_disable(struct stm32_ep_s *privep)
 
   /* Disable endpoint interrupts */
 
-  regval  = stm32_getreg(STM32_OTG_DAINTMSK);
+  regval  = AW_USB_GET_DAINTMSK();
   regval &= ~OTG_DAINT_IEP(privep->epphy);
-  stm32_putreg(regval, STM32_OTG_DAINTMSK);
+  AW_USB_SET_DAINTMSK(regval);
 
   /* Cancel any queued write requests */
 
@@ -4598,7 +4732,7 @@ static int stm32_epout_setstall(struct stm32_ep_s *privep)
    * manual.
    */
 
-  uint32_t regaddr;
+  uint32_t regaddr __attribute__((unused));
   uint32_t regval;
 
   /* Put the core in the Global OUT NAK mode */
@@ -4610,9 +4744,9 @@ static int stm32_epout_setstall(struct stm32_ep_s *privep)
    */
 
   regaddr = STM32_OTG_DOEPCTL(privep->epphy);
-  regval  = stm32_getreg(regaddr);
+  regval  = AW_USB_GET_DOEPCTL(privep->epphy);
   regval |= (OTG_DOEPCTL_EPDIS | OTG_DOEPCTL_STALL);
-  stm32_putreg(regval, regaddr);
+  AW_USB_SET_DOEPCTL(privep->epphy, regval);
 
   /* Wait for the EPDISD interrupt which indicates that the OUT
    * endpoint is completely disabled.
@@ -4620,7 +4754,7 @@ static int stm32_epout_setstall(struct stm32_ep_s *privep)
 
 #if 0 /* Doesn't happen */
   regaddr = STM32_OTG_DOEPINT(privep->epphy);
-  while ((stm32_getreg(regaddr) & OTG_DOEPINT_EPDISD) == 0);
+  while ((AW_USB_GET_DOEPINT(privep->epphy) & OTG_DOEPINT_EPDISD) == 0);
 #else
   /* REVISIT: */
 
@@ -4640,7 +4774,7 @@ static int stm32_epout_setstall(struct stm32_ep_s *privep)
 
   /* REVISIT: */
 
-  uint32_t regaddr;
+  uint32_t regaddr __attribute__((unused));
   uint32_t regval;
 
   /* Stall the OUT endpoint by setting the STALL bit in the
@@ -4648,9 +4782,9 @@ static int stm32_epout_setstall(struct stm32_ep_s *privep)
    */
 
   regaddr = STM32_OTG_DOEPCTL(privep->epphy);
-  regval  = stm32_getreg(regaddr);
+  regval  = AW_USB_GET_DOEPCTL(privep->epphy);
   regval |= OTG_DOEPCTL_STALL;
-  stm32_putreg(regval, regaddr);
+  AW_USB_SET_DOEPCTL(privep->epphy, regval);
 
   /* The endpoint is now stalled */
 
@@ -4669,18 +4803,18 @@ static int stm32_epout_setstall(struct stm32_ep_s *privep)
 
 static int stm32_epin_setstall(struct stm32_ep_s *privep)
 {
-  uint32_t regaddr;
+  uint32_t regaddr __attribute__((unused));
   uint32_t regval;
 
   /* Get the IN endpoint device control register */
 
   regaddr = STM32_OTG_DIEPCTL(privep->epphy);
-  regval  = stm32_getreg(regaddr);
+  regval  = AW_USB_GET_DIEPCTL(privep->epphy);
 
   /* Then stall the endpoint */
 
   regval |= OTG_DIEPCTL_STALL;
-  stm32_putreg(regval, regaddr);
+  AW_USB_SET_DIEPCTL(privep->epphy, regval);
 
   /* The endpoint is now stalled */
 
@@ -4722,7 +4856,7 @@ static int stm32_ep_setstall(struct stm32_ep_s *privep)
 
 static int stm32_ep_clrstall(struct stm32_ep_s *privep)
 {
-  uint32_t regaddr;
+  uint32_t regaddr __attribute__((unused));
   uint32_t regval;
   uint32_t stallbit;
   uint32_t data0bit;
@@ -4750,7 +4884,7 @@ static int stm32_ep_clrstall(struct stm32_ep_s *privep)
 
   /* Clear the stall bit */
 
-  regval  = stm32_getreg(regaddr);
+  regval  = AW_USB_GET_BIDIR(privep->epphy, privep->isin);
   regval &= ~stallbit;
 
   /* Set the DATA0 pid for interrupt and bulk endpoints */
@@ -4763,7 +4897,7 @@ static int stm32_ep_clrstall(struct stm32_ep_s *privep)
       regval |= data0bit;
     }
 
-  stm32_putreg(regval, regaddr);
+  AW_USB_SET_BIDIR(privep->epphy, privep->isin, regval);
 
   /* The endpoint is no longer stalled */
 
@@ -4960,7 +5094,7 @@ static int stm32_getframe(struct usbdev_s *dev)
 
   /* Return the last frame number of the last SOF detected by the hardware */
 
-  regval = stm32_getreg(STM32_OTG_DSTS);
+  regval = AW_USB_GET_DSTS();
   return (int)((regval & OTG_DSTS_SOFFN_MASK) >> OTG_DSTS_SOFFN_SHIFT);
 }
 
@@ -4987,24 +5121,24 @@ static int stm32_wakeup(struct usbdev_s *dev)
     {
       /* Yes... is the core suspended? */
 
-      regval = stm32_getreg(STM32_OTG_DSTS);
+      regval = AW_USB_GET_DSTS();
       if ((regval & OTG_DSTS_SUSPSTS) != 0)
         {
           /* Re-start the PHY clock and un-gate USB core clock (HCLK) */
 
 #ifdef CONFIG_USBDEV_LOWPOWER
-          regval = stm32_getreg(STM32_OTG_PCGCCTL);
+          regval = AW_USB_GET_PCGCCTL();
           regval &= ~(OTG_PCGCCTL_STPPCLK | OTG_PCGCCTL_GATEHCLK);
-          stm32_putreg(regval, STM32_OTG_PCGCCTL);
+          AW_USB_SET_PCGCCTL(regval);
 #endif
           /* Activate Remote wakeup signaling */
 
-          regval  = stm32_getreg(STM32_OTG_DCTL);
+          regval  = AW_USB_GET_DCTL();
           regval |= OTG_DCTL_RWUSIG;
-          stm32_putreg(regval, STM32_OTG_DCTL);
+          AW_USB_SET_DCTL(regval);
           up_mdelay(5);
           regval &= ~OTG_DCTL_RWUSIG;
-          stm32_putreg(regval, STM32_OTG_DCTL);
+          AW_USB_SET_DCTL(regval);
         }
     }
 
@@ -5053,7 +5187,7 @@ static int stm32_pullup(struct usbdev_s *dev, bool enable)
   usbtrace(TRACE_DEVPULLUP, (uint16_t)enable);
 
   irqstate_t flags = enter_critical_section();
-  regval = stm32_getreg(STM32_OTG_DCTL);
+  regval = AW_USB_GET_DCTL();
   if (enable)
     {
       /* Connect the device by clearing the soft disconnect bit in the DCTL
@@ -5071,7 +5205,7 @@ static int stm32_pullup(struct usbdev_s *dev, bool enable)
       regval |= OTG_DCTL_SDIS;
     }
 
-  stm32_putreg(regval, STM32_OTG_DCTL);
+  AW_USB_SET_DCTL(regval);
   leave_critical_section(flags);
   return OK;
 }
@@ -5090,10 +5224,10 @@ static void stm32_setaddress(struct stm32_usbdev_s *priv, uint16_t address)
 
   /* Set the device address in the DCFG register */
 
-  regval = stm32_getreg(STM32_OTG_DCFG);
+  regval = AW_USB_GET_DCFG();
   regval &= ~OTG_DCFG_DAD_MASK;
   regval |= ((uint32_t)address << OTG_DCFG_DAD_SHIFT);
-  stm32_putreg(regval, STM32_OTG_DCFG);
+  AW_USB_SET_DCFG(regval);
 
   /* Are we now addressed?  (i.e., do we have a non-NULL device
    * address?)
@@ -5127,13 +5261,13 @@ static int stm32_txfifo_flush(uint32_t txfnum)
   /* Initiate the TX FIFO flush operation */
 
   regval = OTG_GRSTCTL_TXFFLSH | txfnum;
-  stm32_putreg(regval, STM32_OTG_GRSTCTL);
+  AW_USB_SET_GRSTCTL(regval);
 
   /* Wait for the FLUSH to complete */
 
   for (timeout = 0; timeout < STM32_FLUSH_DELAY; timeout++)
     {
-      regval = stm32_getreg(STM32_OTG_GRSTCTL);
+      regval = AW_USB_GET_GRSTCTL();
       if ((regval & OTG_GRSTCTL_TXFFLSH) == 0)
         {
           break;
@@ -5161,13 +5295,13 @@ static int stm32_rxfifo_flush(void)
 
   /* Initiate the RX FIFO flush operation */
 
-  stm32_putreg(OTG_GRSTCTL_RXFFLSH, STM32_OTG_GRSTCTL);
+  AW_USB_SET_GRSTCTL(OTG_GRSTCTL_RXFFLSH);
 
   /* Wait for the FLUSH to complete */
 
   for (timeout = 0; timeout < STM32_FLUSH_DELAY; timeout++)
     {
-      regval = stm32_getreg(STM32_OTG_GRSTCTL);
+      regval = AW_USB_GET_GRSTCTL();
       if ((regval & OTG_GRSTCTL_RXFFLSH) == 0)
         {
           break;
@@ -5282,23 +5416,23 @@ static void stm32_hwinitialize(struct stm32_usbdev_s *priv)
    * (not just half full).
    */
 
-  stm32_putreg(OTG_GAHBCFG_TXFELVL, STM32_OTG_GAHBCFG);
+  AW_USB_SET_GAHBCFG(OTG_GAHBCFG_TXFELVL);
 
 #if defined(CONFIG_STM32H7_OTGHS_NO_ULPI) || defined(CONFIG_STM32H7_OTGFS)
   /* Full speed serial transceiver select */
 
-  regval = stm32_getreg(STM32_OTG_GUSBCFG);
+  regval = AW_USB_GET_GUSBCFG();
   regval |= OTG_GUSBCFG_PHYSEL;
-  stm32_putreg(regval, STM32_OTG_GUSBCFG);
+  AW_USB_SET_GUSBCFG(regval);
 #endif
 
 #if defined(CONFIG_STM32H7_OTGHS_FS) &&         \
     defined(CONFIG_STM32H7_OTGHS_EXTERNAL_ULPI)
   /* ULPI Full speed mode */
 
-  regval = stm32_getreg(STM32_OTG_GUSBCFG);
+  regval = AW_USB_GET_GUSBCFG();
   regval |= OTG_GUSBCFG_ULPIFSL;
-  stm32_putreg(regval, STM32_OTG_GUSBCFG);
+  AW_USB_SET_GUSBCFG(regval);
 #endif
 
   /* Common USB OTG core initialization */
@@ -5308,7 +5442,7 @@ static void stm32_hwinitialize(struct stm32_usbdev_s *priv)
   for (timeout = 0; timeout < STM32_READY_DELAY; timeout++)
     {
       up_udelay(3);
-      regval = stm32_getreg(STM32_OTG_GRSTCTL);
+      regval = AW_USB_GET_GRSTCTL();
       if ((regval & OTG_GRSTCTL_AHBIDL) != 0)
         {
           break;
@@ -5317,12 +5451,12 @@ static void stm32_hwinitialize(struct stm32_usbdev_s *priv)
 
   /* Then perform the core soft reset. */
 
-  regval = stm32_getreg(STM32_OTG_GRSTCTL);
+  regval = AW_USB_GET_GRSTCTL();
   regval |= OTG_GRSTCTL_CSRST;
-  stm32_putreg(regval, STM32_OTG_GRSTCTL);
+  AW_USB_SET_GRSTCTL(regval);
   for (timeout = 0; timeout < STM32_READY_DELAY; timeout++)
     {
-      regval = stm32_getreg(STM32_OTG_GRSTCTL);
+      regval = AW_USB_GET_GRSTCTL();
       if ((regval & OTG_GRSTCTL_CSRST) == 0)
         {
           break;
@@ -5333,7 +5467,7 @@ static void stm32_hwinitialize(struct stm32_usbdev_s *priv)
 
   up_udelay(3);
 
-  regval = stm32_getreg(STM32_OTG_GCCFG);
+  regval = AW_USB_GET_GCCFG();
 
 #if defined(CONFIG_STM32H7_OTGHS_NO_ULPI) || defined(CONFIG_STM32H7_OTGFS)
   /* Enable USB FS transceiver */
@@ -5347,7 +5481,7 @@ static void stm32_hwinitialize(struct stm32_usbdev_s *priv)
   regval |= OTG_GCCFG_VBDEN;
 #endif
 
-  stm32_putreg(regval, STM32_OTG_GCCFG);
+  AW_USB_SET_GCCFG(regval);
   up_mdelay(20);
 
 #ifdef CONFIG_STM32H7_OTGHS_EXTERNAL_ULPI
@@ -5355,43 +5489,43 @@ static void stm32_hwinitialize(struct stm32_usbdev_s *priv)
    * as such as USB334x
    */
 
-  regval  = stm32_getreg(STM32_OTG_DCFG);
+  regval  = AW_USB_GET_DCFG();
   regval |= OTG_DCFG_XCVRDLY;
-  stm32_putreg(regval, STM32_OTG_DCFG);
+  AW_USB_SET_DCFG(regval);
 #endif
 
   /* When VBUS sensing is not used we need to force the B session valid */
 
 #ifndef CONFIG_USBDEV_VBUSSENSING
-  regval = stm32_getreg(STM32_OTG_GOTGCTL);
+  regval = AW_USB_GET_GOTGCTL();
   regval |= (OTG_GOTGCTL_BVALOEN | OTG_GOTGCTL_BVALOVAL);
-  stm32_putreg(regval, STM32_OTG_GOTGCTL);
+  AW_USB_SET_GOTGCTL(regval);
 #endif
 
   /* Force Device Mode */
 
-  regval  = stm32_getreg(STM32_OTG_GUSBCFG);
+  regval  = AW_USB_GET_GUSBCFG();
   regval &= ~OTG_GUSBCFG_FHMOD;
   regval |= OTG_GUSBCFG_FDMOD;
-  stm32_putreg(regval, STM32_OTG_GUSBCFG);
+  AW_USB_SET_GUSBCFG(regval);
   up_mdelay(50);
 
   /* Initialize device mode */
 
   /* Restart the PHY Clock */
 
-  stm32_putreg(0, STM32_OTG_PCGCCTL);
+  AW_USB_SET_PCGCCTL(0);
 
   /* Device configuration register */
 
-  regval = stm32_getreg(STM32_OTG_DCFG);
+  regval = AW_USB_GET_DCFG();
   regval &= ~OTG_DCFG_PFIVL_MASK;
   regval |= OTG_DCFG_PFIVL_80PCT;
-  stm32_putreg(regval, STM32_OTG_DCFG);
+  AW_USB_SET_DCFG(regval);
 
   /* Set device high or full speed */
 
-  regval = stm32_getreg(STM32_OTG_DCFG);
+  regval = AW_USB_GET_DCFG();
   regval &= ~OTG_DCFG_DSPD_MASK;
 #if defined(CONFIG_STM32H7_OTGHS_FS)
   regval |= OTG_DCFG_DSPD_FSHS;
@@ -5400,73 +5534,73 @@ static void stm32_hwinitialize(struct stm32_usbdev_s *priv)
 #else
   regval |= OTG_DCFG_DSPD_FS;
 #endif
-  stm32_putreg(regval, STM32_OTG_DCFG);
+  AW_USB_SET_DCFG(regval);
 
   /* Set Rx FIFO size */
 
-  stm32_putreg(STM32_RXFIFO_WORDS, STM32_OTG_GRXFSIZ);
+  AW_USB_SET_GRXFSIZ(STM32_RXFIFO_WORDS);
 
 #if STM32_NENDPOINTS > 0
   address = STM32_RXFIFO_WORDS;
   regval  = (address << OTG_DIEPTXF0_TX0FD_SHIFT) |
             (STM32_EP0_TXFIFO_WORDS << OTG_DIEPTXF0_TX0FSA_SHIFT);
-  stm32_putreg(regval, STM32_OTG_DIEPTXF0);
+  AW_USB_SET_TXFIFO0(regval);
 #endif
 
 #if STM32_NENDPOINTS > 1
   address += STM32_EP0_TXFIFO_WORDS;
   regval   = (address << OTG_DIEPTXF_INEPTXSA_SHIFT) |
              (STM32_EP1_TXFIFO_WORDS << OTG_DIEPTXF_INEPTXFD_SHIFT);
-  stm32_putreg(regval, STM32_OTG_DIEPTXF(1));
+  AW_USB_SET_DIEPTXF(1, regval);
 #endif
 
 #if STM32_NENDPOINTS > 2
   address += STM32_EP1_TXFIFO_WORDS;
   regval   = (address << OTG_DIEPTXF_INEPTXSA_SHIFT) |
              (STM32_EP2_TXFIFO_WORDS << OTG_DIEPTXF_INEPTXFD_SHIFT);
-  stm32_putreg(regval, STM32_OTG_DIEPTXF(2));
+  AW_USB_SET_DIEPTXF(2, regval);
 #endif
 
 #if STM32_NENDPOINTS > 3
   address += STM32_EP2_TXFIFO_WORDS;
   regval   = (address << OTG_DIEPTXF_INEPTXSA_SHIFT) |
              (STM32_EP3_TXFIFO_WORDS << OTG_DIEPTXF_INEPTXFD_SHIFT);
-  stm32_putreg(regval, STM32_OTG_DIEPTXF(3));
+  AW_USB_SET_DIEPTXF(3, regval);
 #endif
 
 #if STM32_NENDPOINTS > 4
   address += STM32_EP3_TXFIFO_WORDS;
   regval   = (address << OTG_DIEPTXF_INEPTXSA_SHIFT) |
              (STM32_EP4_TXFIFO_WORDS << OTG_DIEPTXF_INEPTXFD_SHIFT);
-  stm32_putreg(regval, STM32_OTG_DIEPTXF(4));
+  AW_USB_SET_DIEPTXF(4, regval);
 #endif
 
 #if STM32_NENDPOINTS > 5
   address += STM32_EP4_TXFIFO_WORDS;
   regval   = (address << OTG_DIEPTXF_INEPTXSA_SHIFT) |
              (STM32_EP5_TXFIFO_WORDS << OTG_DIEPTXF_INEPTXFD_SHIFT);
-  stm32_putreg(regval, STM32_OTG_DIEPTXF(5));
+  AW_USB_SET_DIEPTXF(5, regval);
 #endif
 
 #if STM32_NENDPOINTS > 6
   address += STM32_EP5_TXFIFO_WORDS;
   regval   = (address << OTG_DIEPTXF_INEPTXSA_SHIFT) |
              (STM32_EP6_TXFIFO_WORDS << OTG_DIEPTXF_INEPTXFD_SHIFT);
-  stm32_putreg(regval, STM32_OTG_DIEPTXF(6));
+  AW_USB_SET_DIEPTXF(6, regval);
 #endif
 
 #if STM32_NENDPOINTS > 7
   address += STM32_EP6_TXFIFO_WORDS;
   regval   = (address << OTG_DIEPTXF_INEPTXSA_SHIFT) |
              (STM32_EP7_TXFIFO_WORDS << OTG_DIEPTXF_INEPTXFD_SHIFT);
-  stm32_putreg(regval, STM32_OTG_DIEPTXF(7));
+  AW_USB_SET_DIEPTXF(7, regval);
 #endif
 
 #if STM32_NENDPOINTS > 8
   address += STM32_EP7_TXFIFO_WORDS;
   regval   = (address << OTG_DIEPTXF_INEPTXSA_SHIFT) |
              (STM32_EP8_TXFIFO_WORDS << OTG_DIEPTXF_INEPTXFD_SHIFT);
-  stm32_putreg(regval, STM32_OTG_DIEPTXF(8));
+  AW_USB_SET_DIEPTXF(8, regval);
 #endif
 
   /* Flush the FIFOs */
@@ -5476,17 +5610,17 @@ static void stm32_hwinitialize(struct stm32_usbdev_s *priv)
 
   /* Clear all pending Device Interrupts */
 
-  stm32_putreg(0, STM32_OTG_DIEPMSK);
-  stm32_putreg(0, STM32_OTG_DOEPMSK);
-  stm32_putreg(0, STM32_OTG_DIEPEMPMSK);
-  stm32_putreg(0xffffffff, STM32_OTG_DAINT);
-  stm32_putreg(0, STM32_OTG_DAINTMSK);
+  AW_USB_SET_DIEPMSK(0);
+  AW_USB_SET_DOEPMSK(0);
+  AW_USB_SET_DIEPEMPMSK(0);
+  AW_USB_SET_DAINT(0xffffffff);
+  AW_USB_SET_DAINTMSK(0);
 
   /* Configure all IN endpoints */
 
   for (i = 0; i < STM32_NENDPOINTS; i++)
     {
-      regval = stm32_getreg(STM32_OTG_DIEPCTL(i));
+      regval = AW_USB_GET_DIEPCTL(i);
       if ((regval & OTG_DIEPCTL_EPENA) != 0)
         {
           /* The endpoint is already enabled */
@@ -5498,16 +5632,16 @@ static void stm32_hwinitialize(struct stm32_usbdev_s *priv)
           regval = 0;
         }
 
-      stm32_putreg(regval, STM32_OTG_DIEPCTL(i));
-      stm32_putreg(0, STM32_OTG_DIEPTSIZ(i));
-      stm32_putreg(0xff, STM32_OTG_DIEPINT(i));
+      AW_USB_SET_DIEPCTL(i, regval);
+      AW_USB_SET_DIEPTSIZ(i, 0);
+      AW_USB_SET_DIEPINT(i, 0xff);
     }
 
   /* Configure all OUT endpoints */
 
   for (i = 0; i < STM32_NENDPOINTS; i++)
     {
-      regval = stm32_getreg(STM32_OTG_DOEPCTL(i));
+      regval = AW_USB_GET_DOEPCTL(i);
       if ((regval & OTG_DOEPCTL_EPENA) != 0)
         {
           /* The endpoint is already enabled */
@@ -5519,24 +5653,24 @@ static void stm32_hwinitialize(struct stm32_usbdev_s *priv)
           regval = 0;
         }
 
-      stm32_putreg(regval, STM32_OTG_DOEPCTL(i));
-      stm32_putreg(0, STM32_OTG_DOEPTSIZ(i));
-      stm32_putreg(0xff, STM32_OTG_DOEPINT(i));
+      AW_USB_SET_DOEPCTL(i, regval);
+      AW_USB_SET_DOEPTSIZ(i, 0);
+      AW_USB_SET_DOEPINT(i, 0xff);
     }
 
   /* Disable all interrupts. */
 
-  stm32_putreg(0, STM32_OTG_GINTMSK);
+  AW_USB_SET_GINTMSK(0);
 
   /* Clear any pending USB_OTG Interrupts */
 
-  stm32_putreg(0xffffffff, STM32_OTG_GOTGINT);
+  AW_USB_SET_GOTGINT(0xffffffff);
 
   /* Clear any pending interrupts */
 
-  regval = stm32_getreg(STM32_OTG_GINTSTS);
+  regval = AW_USB_GET_GINTSTS();
   regval &=  OTG_GINT_RESERVED;
-  stm32_putreg(regval | OTG_GINT_RC_W1, STM32_OTG_GINTSTS);
+  AW_USB_SET_GINTSTS(regval | OTG_GINT_RC_W1);
 
 #if defined(CONFIG_STM32H7_OTGHS) && defined(CONFIG_STM32H7_OTGHS_NO_ULPI)
   /* Disable the ULPI Clock enable in RCC AHB1 Register.  This must
@@ -5571,7 +5705,7 @@ static void stm32_hwinitialize(struct stm32_usbdev_s *priv)
   regval |= OTG_GINT_MMIS;
 #endif
 
-  stm32_putreg(regval, STM32_OTG_GINTMSK);
+  AW_USB_SET_GINTMSK(regval);
 
   /* Enable the USB global interrupt by setting GINTMSK in the global OTG
    * AHB configuration register; Set the TXFELVL bit in the GAHBCFG
@@ -5579,8 +5713,7 @@ static void stm32_hwinitialize(struct stm32_usbdev_s *priv)
    * empty (not just half full).
    */
 
-  stm32_putreg(OTG_GAHBCFG_GINTMSK | OTG_GAHBCFG_TXFELVL,
-               STM32_OTG_GAHBCFG);
+  AW_USB_SET_GAHBCFG(OTG_GAHBCFG_GINTMSK | OTG_GAHBCFG_TXFELVL);
 }
 
 /****************************************************************************
@@ -5619,7 +5752,7 @@ void arm_usbinitialize(void)
 
   /* Configure USB voltage regulator */
 
-  regval = stm32_getreg(STM32_PWR_CR3);
+  regval = AW_USB_GET_POWER();
 
   /* Enable USB regulator if configured */
 
@@ -5632,9 +5765,9 @@ void arm_usbinitialize(void)
   /* Enable VDD33USB supply level detector */
 
   regval |= STM32_PWR_CR3_USB33DEN;
-  stm32_putreg(regval, STM32_PWR_CR3);
+  AW_USB_SET_POWER(regval);
 
-  while ((stm32_getreg(STM32_PWR_CR3) & STM32_PWR_CR3_USB33RDY) == 0)
+  while ((AW_USB_GET_POWER() & STM32_PWR_CR3_USB33RDY) == 0)
     {
     }
 
@@ -5765,15 +5898,15 @@ void arm_usbuninitialize(void)
 
   for (i = 0; i < STM32_NENDPOINTS; i++)
     {
-      stm32_putreg(0xff, STM32_OTG_DIEPINT(i));
-      stm32_putreg(0xff, STM32_OTG_DOEPINT(i));
+      AW_USB_SET_DIEPINT(i, 0xff);
+      AW_USB_SET_DOEPINT(i, 0xff);
     }
 
-  stm32_putreg(0, STM32_OTG_DIEPMSK);
-  stm32_putreg(0, STM32_OTG_DOEPMSK);
-  stm32_putreg(0, STM32_OTG_DIEPEMPMSK);
-  stm32_putreg(0, STM32_OTG_DAINTMSK);
-  stm32_putreg(0xffffffff, STM32_OTG_DAINT);
+  AW_USB_SET_DIEPMSK(0);
+  AW_USB_SET_DOEPMSK(0);
+  AW_USB_SET_DIEPEMPMSK(0);
+  AW_USB_SET_DAINTMSK(0);
+  AW_USB_SET_DAINT(0xffffffff);
 
   /* Flush the FIFOs */
 

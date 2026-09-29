@@ -31,6 +31,11 @@
 #include <debug.h>
 
 #include <nuttx/irq.h>
+
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+#  define AW_CPU_PINS_IRQ_INTRINSICS_ONLY 1
+#  include "aw_cpu_pins_irq.h"
+#endif
 #include <arch/stm32h7/chip.h>
 
 #include "arm_internal.h"
@@ -140,6 +145,9 @@ void stm32_gpioinit(void)
 
 int stm32_configgpio(uint32_t cfgset)
 {
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  return aw_cpu_gpio_config(cfgset);
+#else
   uintptr_t base;
   uint32_t regval;
   uint32_t setting;
@@ -383,6 +391,7 @@ int stm32_configgpio(uint32_t cfgset)
 
   leave_critical_section(flags);
   return OK;
+#endif
 }
 
 /****************************************************************************
@@ -408,6 +417,9 @@ int stm32_configgpio(uint32_t cfgset)
 
 int stm32_unconfiggpio(uint32_t cfgset)
 {
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  return aw_cpu_gpio_unconfig(cfgset);
+#else
   /* Reuse port and pin number and set it to default HiZ INPUT */
 
   cfgset &= GPIO_PORT_MASK | GPIO_PIN_MASK;
@@ -416,6 +428,7 @@ int stm32_unconfiggpio(uint32_t cfgset)
   /* To-Do: Mark its unuse for automatic power saving options */
 
   return stm32_configgpio(cfgset);
+#endif
 }
 
 /****************************************************************************
@@ -428,6 +441,9 @@ int stm32_unconfiggpio(uint32_t cfgset)
 
 void stm32_gpiowrite(uint32_t pinset, bool value)
 {
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  aw_cpu_gpio_write(pinset, value ? 1u : 0u);
+#else
   uint32_t base;
   uint32_t bit;
   unsigned int port;
@@ -459,6 +475,7 @@ void stm32_gpiowrite(uint32_t pinset, bool value)
           putreg32(bit, base + STM32_GPIO_BSRR_OFFSET);
         }
     }
+#endif
 }
 
 /****************************************************************************
@@ -471,6 +488,9 @@ void stm32_gpiowrite(uint32_t pinset, bool value)
 
 bool stm32_gpioread(uint32_t pinset)
 {
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  return aw_cpu_gpio_read(pinset) != 0u;
+#else
   uint32_t base;
   unsigned int port;
   unsigned int pin;
@@ -492,6 +512,7 @@ bool stm32_gpioread(uint32_t pinset)
     }
 
   return 0;
+#endif
 }
 
 /****************************************************************************
@@ -517,7 +538,8 @@ bool stm32_gpioread(uint32_t pinset)
  *
  ****************************************************************************/
 
-#ifdef CONFIG_STM32H7_SYSCFG_IOCOMPENSATION
+#if defined(CONFIG_STM32H7_SYSCFG_IOCOMPENSATION) && \
+    !defined(CONFIG_ARM_TRUSTRAM_AW_CPU)
 void stm32_iocompensation(void)
 {
   /* Enable I/O Compensation.  Writing '1' to the CMPCR power-down bit

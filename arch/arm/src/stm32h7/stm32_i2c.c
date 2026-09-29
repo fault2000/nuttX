@@ -202,6 +202,14 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+# define AW_CPU_I2C_INTRINSICS_ONLY 1
+# include "aw_cpu_i2c.h"
+# if defined(CONFIG_I2C_POLLED) || defined(CONFIG_PM)
+#  error "AW CPU I2C requires fixed interrupt-driven I2C3/4 without PM"
+# endif
+#endif
+
 
 #include <sys/types.h>
 #include <inttypes.h>
@@ -440,6 +448,7 @@ struct stm32_i2c_inst_s
  * Private Function Prototypes
  ****************************************************************************/
 
+#ifndef CONFIG_ARM_TRUSTRAM_AW_CPU
 static inline uint16_t stm32_i2c_getreg(struct stm32_i2c_priv_s *priv,
                                         uint8_t offset);
 static inline void stm32_i2c_putreg(struct stm32_i2c_priv_s *priv,
@@ -449,6 +458,7 @@ static inline void stm32_i2c_putreg32(struct stm32_i2c_priv_s *priv,
 static inline void stm32_i2c_modifyreg32(struct stm32_i2c_priv_s *priv,
                                          uint8_t offset, uint32_t clearbits,
                                          uint32_t setbits);
+#endif
 #ifdef CONFIG_STM32H7_I2C_DYNTIMEO
 static uint32_t stm32_i2c_toticks(int msgc, struct i2c_msg_s *msgs);
 #endif /* CONFIG_STM32H7_I2C_DYNTIMEO */
@@ -494,7 +504,7 @@ static int stm32_i2c_pm_prepare(struct pm_callback_s *cb, int domain,
  * Private Data
  ****************************************************************************/
 
-#ifdef CONFIG_STM32H7_I2C1
+#if defined(CONFIG_STM32H7_I2C1) && !defined(CONFIG_ARM_TRUSTRAM_AW_CPU)
 static const struct stm32_i2c_config_s stm32_i2c1_config =
 {
   .base          = STM32_I2C1_BASE,
@@ -526,7 +536,7 @@ static struct stm32_i2c_priv_s stm32_i2c1_priv =
 };
 #endif
 
-#ifdef CONFIG_STM32H7_I2C2
+#if defined(CONFIG_STM32H7_I2C2) && !defined(CONFIG_ARM_TRUSTRAM_AW_CPU)
 static const struct stm32_i2c_config_s stm32_i2c2_config =
 {
   .base          = STM32_I2C2_BASE,
@@ -644,6 +654,18 @@ static const struct i2c_ops_s stm32_i2c_ops =
  *
  ****************************************************************************/
 
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+static uint32_t stm32_i2c_aw_bus(struct stm32_i2c_priv_s *priv)
+{
+#ifdef CONFIG_STM32H7_I2C3
+  if (priv == &stm32_i2c3_priv) return 3;
+#endif
+#ifdef CONFIG_STM32H7_I2C4
+  if (priv == &stm32_i2c4_priv) return 4;
+#endif
+  return 0;
+}
+#else
 static inline uint16_t stm32_i2c_getreg(struct stm32_i2c_priv_s *priv,
                                         uint8_t offset)
 {
@@ -706,6 +728,7 @@ static inline void stm32_i2c_modifyreg32(struct stm32_i2c_priv_s *priv,
 {
   modifyreg32(priv->config->base + offset, clearbits, setbits);
 }
+#endif
 
 /****************************************************************************
  * Name: stm32_i2c_toticks
@@ -748,8 +771,12 @@ static uint32_t stm32_i2c_toticks(int msgc, struct i2c_msg_s *msgs)
 #ifndef CONFIG_I2C_POLLED
 static inline void stm32_i2c_enableinterrupts(struct stm32_i2c_priv_s *priv)
 {
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  aw_cpu_i2c_irq_txrx(stm32_i2c_aw_bus(priv));
+#else
     stm32_i2c_modifyreg32(priv, STM32_I2C_CR1_OFFSET, 0,
                           (I2C_CR1_TXRX | I2C_CR1_NACKIE));
+#endif
 }
 #endif
 
@@ -779,8 +806,12 @@ static inline int stm32_i2c_sem_waitdone(struct stm32_i2c_priv_s *priv)
    * here.
    */
 
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  aw_cpu_i2c_irq_rest(stm32_i2c_aw_bus(priv));
+#else
   stm32_i2c_modifyreg32(priv, STM32_I2C_CR1_OFFSET, 0,
                         (I2C_CR1_ALLINTS & ~I2C_CR1_TXRX));
+#endif
 
   /* Signal the interrupt handler that we are waiting */
 
@@ -817,7 +848,11 @@ static inline int stm32_i2c_sem_waitdone(struct stm32_i2c_priv_s *priv)
 
   /* Disable I2C interrupts */
 
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  aw_cpu_i2c_irq_off(stm32_i2c_aw_bus(priv));
+#else
   stm32_i2c_modifyreg32(priv, STM32_I2C_CR1_OFFSET, I2C_CR1_ALLINTS, 0);
+#endif
 
   leave_critical_section(flags);
   return ret;
@@ -884,8 +919,12 @@ static inline int stm32_i2c_sem_waitdone(struct stm32_i2c_priv_s *priv)
 static inline void
 stm32_i2c_set_7bit_address(struct stm32_i2c_priv_s *priv)
 {
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  aw_cpu_i2c_address(stm32_i2c_aw_bus(priv), priv->msgv->addr);
+#else
   stm32_i2c_modifyreg32(priv, STM32_I2C_CR2_OFFSET, I2C_CR2_SADD7_MASK,
                         ((priv->msgv->addr & 0x7f) << I2C_CR2_SADD7_SHIFT));
+#endif
 }
 
 /****************************************************************************
@@ -899,8 +938,12 @@ static inline void
 stm32_i2c_set_bytes_to_transfer(struct stm32_i2c_priv_s *priv,
                                 uint8_t n_bytes)
 {
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  aw_cpu_i2c_bytes(stm32_i2c_aw_bus(priv), n_bytes);
+#else
   stm32_i2c_modifyreg32(priv, STM32_I2C_CR2_OFFSET, I2C_CR2_NBYTES_MASK,
                         (n_bytes << I2C_CR2_NBYTES_SHIFT));
+#endif
 }
 
 /****************************************************************************
@@ -913,7 +956,11 @@ stm32_i2c_set_bytes_to_transfer(struct stm32_i2c_priv_s *priv,
 static inline void
 stm32_i2c_set_write_transfer_dir(struct stm32_i2c_priv_s *priv)
 {
-  stm32_i2c_modifyreg32(priv, STM32_I2C_CR2_OFFSET, I2C_CR2_RD_WRN, 0);
+  #ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+aw_cpu_i2c_direction(stm32_i2c_aw_bus(priv), 0);
+#else
+stm32_i2c_modifyreg32(priv, STM32_I2C_CR2_OFFSET, I2C_CR2_RD_WRN, 0);
+#endif
 }
 
 /****************************************************************************
@@ -926,7 +973,11 @@ stm32_i2c_set_write_transfer_dir(struct stm32_i2c_priv_s *priv)
 static inline void
 stm32_i2c_set_read_transfer_dir(struct stm32_i2c_priv_s *priv)
 {
-  stm32_i2c_modifyreg32(priv, STM32_I2C_CR2_OFFSET, 0, I2C_CR2_RD_WRN);
+  #ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+aw_cpu_i2c_direction(stm32_i2c_aw_bus(priv), 1);
+#else
+stm32_i2c_modifyreg32(priv, STM32_I2C_CR2_OFFSET, 0, I2C_CR2_RD_WRN);
+#endif
 }
 
 /****************************************************************************
@@ -939,7 +990,11 @@ stm32_i2c_set_read_transfer_dir(struct stm32_i2c_priv_s *priv)
 static inline void
 stm32_i2c_enable_reload(struct stm32_i2c_priv_s *priv)
 {
-  stm32_i2c_modifyreg32(priv, STM32_I2C_CR2_OFFSET, 0, I2C_CR2_RELOAD);
+  #ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+aw_cpu_i2c_reload(stm32_i2c_aw_bus(priv), 1);
+#else
+stm32_i2c_modifyreg32(priv, STM32_I2C_CR2_OFFSET, 0, I2C_CR2_RELOAD);
+#endif
 }
 
 /****************************************************************************
@@ -952,7 +1007,11 @@ stm32_i2c_enable_reload(struct stm32_i2c_priv_s *priv)
 static inline void
 stm32_i2c_disable_reload(struct stm32_i2c_priv_s *priv)
 {
-  stm32_i2c_modifyreg32(priv, STM32_I2C_CR2_OFFSET, I2C_CR2_RELOAD, 0);
+  #ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+aw_cpu_i2c_reload(stm32_i2c_aw_bus(priv), 0);
+#else
+stm32_i2c_modifyreg32(priv, STM32_I2C_CR2_OFFSET, I2C_CR2_RELOAD, 0);
+#endif
 }
 
 /****************************************************************************
@@ -990,7 +1049,11 @@ static inline void stm32_i2c_sem_waitstop(struct stm32_i2c_priv_s *priv)
 
       /* Check for STOP condition */
 
-      cr = stm32_i2c_getreg32(priv, STM32_I2C_CR2_OFFSET);
+      #ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+cr = aw_cpu_i2c_control(stm32_i2c_aw_bus(priv)) >> 32;
+#else
+cr = stm32_i2c_getreg32(priv, STM32_I2C_CR2_OFFSET);
+#endif
       if ((cr & I2C_CR2_STOP) == 0)
         {
           return;
@@ -998,7 +1061,11 @@ static inline void stm32_i2c_sem_waitstop(struct stm32_i2c_priv_s *priv)
 
       /* Check for timeout error */
 
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+      sr = aw_cpu_i2c_status(stm32_i2c_aw_bus(priv));
+#else
       sr = stm32_i2c_getreg(priv, STM32_I2C_ISR_OFFSET);
+#endif
       if ((sr & I2C_INT_TIMEOUT) != 0)
         {
           return;
@@ -1241,6 +1308,16 @@ static void stm32_i2c_tracedump(struct stm32_i2c_priv_s *priv)
 static void stm32_i2c_setclock(struct stm32_i2c_priv_s *priv,
                                uint32_t frequency)
 {
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  aw_cpu_i2c_enable(stm32_i2c_aw_bus(priv), 0);
+  if (frequency != priv->frequency)
+    {
+      aw_cpu_i2c_timing(stm32_i2c_aw_bus(priv), frequency);
+      priv->frequency = frequency;
+    }
+  aw_cpu_i2c_enable(stm32_i2c_aw_bus(priv), 1);
+#else
+
   uint8_t presc;
   uint8_t scl_delay;
   uint8_t sda_delay;
@@ -1251,7 +1328,11 @@ static void stm32_i2c_setclock(struct stm32_i2c_priv_s *priv,
    * This will SW reset the device.
    */
 
-  stm32_i2c_modifyreg32(priv, STM32_I2C_CR1_OFFSET, I2C_CR1_PE, 0);
+  #ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+aw_cpu_i2c_enable(stm32_i2c_aw_bus(priv), 0);
+#else
+stm32_i2c_modifyreg32(priv, STM32_I2C_CR1_OFFSET, I2C_CR1_PE, 0);
+#endif
 
   if (frequency != priv->frequency)
     {
@@ -1310,6 +1391,7 @@ static void stm32_i2c_setclock(struct stm32_i2c_priv_s *priv,
   /* Enable I2C peripheral */
 
   stm32_i2c_modifyreg32(priv, STM32_I2C_CR1_OFFSET, 0, I2C_CR1_PE);
+#endif
 }
 
 /****************************************************************************
@@ -1450,7 +1532,11 @@ static inline void stm32_i2c_sendstart(struct stm32_i2c_priv_s *priv)
   i2cinfo("Sending START: dcnt=%i msgc=%i flags=0x%04x\n",
           priv->dcnt, priv->msgc, priv->flags);
 
-  stm32_i2c_modifyreg32(priv, STM32_I2C_CR2_OFFSET, 0, I2C_CR2_START);
+  #ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+aw_cpu_i2c_start(stm32_i2c_aw_bus(priv));
+#else
+stm32_i2c_modifyreg32(priv, STM32_I2C_CR2_OFFSET, 0, I2C_CR2_START);
+#endif
 }
 
 /****************************************************************************
@@ -1470,7 +1556,11 @@ static inline void stm32_i2c_sendstop(struct stm32_i2c_priv_s *priv)
   i2cinfo("Sending STOP\n");
   stm32_i2c_traceevent(priv, I2CEVENT_WRITE_STOP, 0);
 
-  stm32_i2c_modifyreg32(priv, STM32_I2C_CR2_OFFSET, 0, I2C_CR2_STOP);
+  #ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+aw_cpu_i2c_stop(stm32_i2c_aw_bus(priv));
+#else
+stm32_i2c_modifyreg32(priv, STM32_I2C_CR2_OFFSET, 0, I2C_CR2_STOP);
+#endif
 }
 
 /****************************************************************************
@@ -1483,7 +1573,11 @@ static inline void stm32_i2c_sendstop(struct stm32_i2c_priv_s *priv)
 
 static inline uint32_t stm32_i2c_getstatus(struct stm32_i2c_priv_s *priv)
 {
-  return getreg32(priv->config->base + STM32_I2C_ISR_OFFSET);
+  #ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+return aw_cpu_i2c_status(stm32_i2c_aw_bus(priv));
+#else
+return getreg32(priv->config->base + STM32_I2C_ISR_OFFSET);
+#endif
 }
 
 /****************************************************************************
@@ -1496,7 +1590,11 @@ static inline uint32_t stm32_i2c_getstatus(struct stm32_i2c_priv_s *priv)
 
 static inline void stm32_i2c_clearinterrupts(struct stm32_i2c_priv_s *priv)
 {
-  stm32_i2c_modifyreg32(priv, STM32_I2C_ICR_OFFSET, 0, I2C_ICR_CLEARMASK);
+  #ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+aw_cpu_i2c_clear(stm32_i2c_aw_bus(priv));
+#else
+stm32_i2c_modifyreg32(priv, STM32_I2C_ICR_OFFSET, 0, I2C_ICR_CLEARMASK);
+#endif
 }
 
 /****************************************************************************
@@ -1524,7 +1622,11 @@ static int stm32_i2c_isr_process(struct stm32_i2c_priv_s *priv)
 
   /* Get state of the I2C controller */
 
-  status = stm32_i2c_getreg32(priv, STM32_I2C_ISR_OFFSET);
+  #ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+status = aw_cpu_i2c_status(stm32_i2c_aw_bus(priv));
+#else
+status = stm32_i2c_getreg32(priv, STM32_I2C_ISR_OFFSET);
+#endif
 
   i2cinfo("ENTER: status = 0x%08" PRIx32 "\n", status);
 
@@ -1694,7 +1796,11 @@ static int stm32_i2c_isr_process(struct stm32_i2c_priv_s *priv)
 
           /* Transmit current byte */
 
-          stm32_i2c_putreg(priv, STM32_I2C_TXDR_OFFSET, *priv->ptr);
+          #ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+aw_cpu_i2c_tx(stm32_i2c_aw_bus(priv), *priv->ptr);
+#else
+stm32_i2c_putreg(priv, STM32_I2C_TXDR_OFFSET, *priv->ptr);
+#endif
 
           /* Advance to next byte */
 
@@ -1778,7 +1884,11 @@ static int stm32_i2c_isr_process(struct stm32_i2c_priv_s *priv)
 #endif
           /* Receive a byte */
 
-          *priv->ptr = stm32_i2c_getreg(priv, STM32_I2C_RXDR_OFFSET);
+          #ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+*priv->ptr = aw_cpu_i2c_rx(stm32_i2c_aw_bus(priv));
+#else
+*priv->ptr = stm32_i2c_getreg(priv, STM32_I2C_RXDR_OFFSET);
+#endif
 
           i2cinfo("RXNE: Read Data 0x%02x\n", *priv->ptr);
 
@@ -1799,7 +1909,11 @@ static int stm32_i2c_isr_process(struct stm32_i2c_priv_s *priv)
           /* Unsupported state */
 
           stm32_i2c_traceevent(priv, I2CEVENT_READ_ERROR, 0);
-          status = stm32_i2c_getreg(priv, STM32_I2C_ISR_OFFSET);
+          #ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+status = aw_cpu_i2c_status(stm32_i2c_aw_bus(priv));
+#else
+status = stm32_i2c_getreg(priv, STM32_I2C_ISR_OFFSET);
+#endif
           i2cerr("ERROR: RXNE Unsupported state detected, dcnt=%i, "
                  "status 0x%08" PRIx32 "\n",
                  priv->dcnt, status);
@@ -2046,7 +2160,11 @@ static int stm32_i2c_isr_process(struct stm32_i2c_priv_s *priv)
 
   else if (priv->dcnt == -1 && priv->msgc == 0)
     {
-      status = stm32_i2c_getreg(priv, STM32_I2C_ISR_OFFSET);
+      #ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+status = aw_cpu_i2c_status(stm32_i2c_aw_bus(priv));
+#else
+status = stm32_i2c_getreg(priv, STM32_I2C_ISR_OFFSET);
+#endif
       i2cwarn("WARNING: EMPTY CALL: Stopping ISR: status 0x%08" PRIx32 "\n",
               status);
       stm32_i2c_traceevent(priv, I2CEVENT_ISR_EMPTY_CALL, 0);
@@ -2069,7 +2187,11 @@ static int stm32_i2c_isr_process(struct stm32_i2c_priv_s *priv)
 #else
       /* Read rest of the state */
 
-      status = stm32_i2c_getreg(priv, STM32_I2C_ISR_OFFSET);
+      #ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+status = aw_cpu_i2c_status(stm32_i2c_aw_bus(priv));
+#else
+status = stm32_i2c_getreg(priv, STM32_I2C_ISR_OFFSET);
+#endif
 
       i2cerr("ERROR: Invalid state detected, status 0x%08" PRIx32 "\n",
              status);
@@ -2116,12 +2238,20 @@ static int stm32_i2c_isr_process(struct stm32_i2c_priv_s *priv)
        * flag will naturally be cleared by that process.
        */
 
-      status = stm32_i2c_getreg32(priv, STM32_I2C_ISR_OFFSET);
+      #ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+status = aw_cpu_i2c_status(stm32_i2c_aw_bus(priv));
+#else
+status = stm32_i2c_getreg32(priv, STM32_I2C_ISR_OFFSET);
+#endif
 
       /* Clear all interrupts */
 
-      stm32_i2c_modifyreg32(priv, STM32_I2C_ICR_OFFSET,
+      #ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+aw_cpu_i2c_clear(stm32_i2c_aw_bus(priv));
+#else
+stm32_i2c_modifyreg32(priv, STM32_I2C_ICR_OFFSET,
                             0, I2C_ICR_CLEARMASK);
+#endif
 
       /* Was a bad state detected in the processing? */
 
@@ -2129,7 +2259,11 @@ static int stm32_i2c_isr_process(struct stm32_i2c_priv_s *priv)
         {
           /* SW reset device  */
 
-          stm32_i2c_modifyreg32(priv, STM32_I2C_CR1_OFFSET, I2C_CR1_PE, 0);
+          #ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+aw_cpu_i2c_enable(stm32_i2c_aw_bus(priv), 0);
+#else
+stm32_i2c_modifyreg32(priv, STM32_I2C_CR1_OFFSET, I2C_CR1_PE, 0);
+#endif
         }
 
       /* Update private status from above sans I2C_INT_BAD_STATE */
@@ -2146,7 +2280,11 @@ static int stm32_i2c_isr_process(struct stm32_i2c_priv_s *priv)
 #endif
     }
 
-  status = stm32_i2c_getreg32(priv, STM32_I2C_ISR_OFFSET);
+  #ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+status = aw_cpu_i2c_status(stm32_i2c_aw_bus(priv));
+#else
+status = stm32_i2c_getreg32(priv, STM32_I2C_ISR_OFFSET);
+#endif
   i2cinfo("EXIT: status = 0x%08" PRIx32 "\n", status);
 
   return OK;
@@ -2184,20 +2322,30 @@ static int stm32_i2c_init(struct stm32_i2c_priv_s *priv)
 
   /* Enable power and reset the peripheral */
 
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  aw_cpu_i2c_init(stm32_i2c_aw_bus(priv));
+#else
   modifyreg32(STM32_RCC_APB1LENR, 0, priv->config->clk_bit);
   modifyreg32(STM32_RCC_APB1LRSTR, 0, priv->config->reset_bit);
   modifyreg32(STM32_RCC_APB1LRSTR, priv->config->reset_bit, 0);
+#endif
 
   /* Configure pins */
 
   if (stm32_configgpio(priv->config->scl_pin) < 0)
     {
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+      aw_cpu_i2c_deinit(stm32_i2c_aw_bus(priv));
+#endif
       return ERROR;
     }
 
   if (stm32_configgpio(priv->config->sda_pin) < 0)
     {
       stm32_unconfiggpio(priv->config->scl_pin);
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+      aw_cpu_i2c_deinit(stm32_i2c_aw_bus(priv));
+#endif
       return ERROR;
     }
 
@@ -2219,6 +2367,9 @@ static int stm32_i2c_init(struct stm32_i2c_priv_s *priv)
 
   priv->frequency = 0;
   stm32_i2c_setclock(priv, 100000);
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  aw_cpu_i2c_finish_init(stm32_i2c_aw_bus(priv));
+#endif
 
   return OK;
 }
@@ -2235,7 +2386,11 @@ static int stm32_i2c_deinit(struct stm32_i2c_priv_s *priv)
 {
   /* Disable I2C */
 
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  aw_cpu_i2c_deinit(stm32_i2c_aw_bus(priv));
+#else
   stm32_i2c_putreg32(priv, STM32_I2C_CR1_OFFSET, 0);
+#endif
 
   /* Unconfigure GPIO pins */
 
@@ -2254,7 +2409,9 @@ static int stm32_i2c_deinit(struct stm32_i2c_priv_s *priv)
 
   /* Disable clocking */
 
+#ifndef CONFIG_ARM_TRUSTRAM_AW_CPU
   modifyreg32(STM32_RCC_APB1LENR, priv->config->clk_bit, 0);
+#endif
 
   return OK;
 }
@@ -2334,8 +2491,14 @@ static int stm32_i2c_process(struct i2c_master_s *dev,
 
   waitrc = stm32_i2c_sem_waitdone(priv);
 
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  uint64_t control = aw_cpu_i2c_control(stm32_i2c_aw_bus(priv));
+  cr1 = control;
+  cr2 = control >> 32;
+#else
   cr1 = stm32_i2c_getreg32(priv, STM32_I2C_CR1_OFFSET);
   cr2 = stm32_i2c_getreg32(priv, STM32_I2C_CR2_OFFSET);
+#endif
 #if !defined(CONFIG_DEBUG_I2C)
   UNUSED(cr1);
   UNUSED(cr2);
@@ -2491,6 +2654,9 @@ static int stm32_i2c_process(struct i2c_master_s *dev,
   /* Dump the trace result */
 
   stm32_i2c_tracedump(priv);
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  aw_cpu_i2c_release(stm32_i2c_aw_bus(priv));
+#endif
   stm32_i2c_sem_post(dev);
 
   return -errval;
@@ -2514,6 +2680,9 @@ static int stm32_i2c_transfer(struct i2c_master_s *dev,
   ret = nxsem_wait(&((struct stm32_i2c_inst_s *)dev)->priv->sem_excl);
   if (ret >= 0)
     {
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+      aw_cpu_i2c_claim(stm32_i2c_aw_bus(((struct stm32_i2c_inst_s *)dev)->priv));
+#endif
       ret = stm32_i2c_process(dev, msgs, count);
     }
 
@@ -2644,7 +2813,13 @@ static int stm32_i2c_reset(struct i2c_master_s * dev)
 
   /* Restore the frequency */
 
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  aw_cpu_i2c_claim(stm32_i2c_aw_bus(priv));
+#endif
   stm32_i2c_setclock(priv, frequency);
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  aw_cpu_i2c_release(stm32_i2c_aw_bus(priv));
+#endif
   ret = OK;
 
 out:
@@ -2765,12 +2940,12 @@ struct i2c_master_s *stm32_i2cbus_initialize(int port)
 
   switch (port)
     {
-#ifdef CONFIG_STM32H7_I2C1
+#if defined(CONFIG_STM32H7_I2C1) && !defined(CONFIG_ARM_TRUSTRAM_AW_CPU)
       case 1:
         priv = (struct stm32_i2c_priv_s *)&stm32_i2c1_priv;
         break;
 #endif
-#ifdef CONFIG_STM32H7_I2C2
+#if defined(CONFIG_STM32H7_I2C2) && !defined(CONFIG_ARM_TRUSTRAM_AW_CPU)
       case 2:
         priv = (struct stm32_i2c_priv_s *)&stm32_i2c2_priv;
         break;

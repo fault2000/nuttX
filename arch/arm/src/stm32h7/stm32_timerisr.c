@@ -34,6 +34,10 @@
 #include "clock/clock.h"
 #include "arm_internal.h"
 #include "chip.h"
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+# define AW_CPU_CHIP_INTRINSICS_ONLY 1
+# include "aw_cpu_chip.h"
+#endif
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -133,6 +137,11 @@ static int stm32_timerisr(int irq, uint32_t *regs, void *arg)
 
 void up_timer_initialize(void)
 {
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  aw_cpu_systick_configure();
+  irq_attach(STM32_IRQ_SYSTICK, (xcpt_t)stm32_timerisr, NULL);
+  aw_cpu_systick_start();
+#else
   uint32_t regval;
 
   /* Configure SysTick to interrupt at the requested rate */
@@ -162,4 +171,5 @@ void up_timer_initialize(void)
   /* And enable the timer interrupt */
 
   up_enable_irq(STM32_IRQ_SYSTICK);
+#endif
 }
