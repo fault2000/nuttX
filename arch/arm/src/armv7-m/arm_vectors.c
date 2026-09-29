@@ -58,6 +58,11 @@
 /* Chip-specific entrypoint */
 
 extern void __start(void);
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+extern void aw_cpu_reset(void);
+extern void aw_cpu_boot_fault(void);
+extern void aw_cpu_exception_entry(void);
+#endif
 
 /* Common exception entrypoint */
 
@@ -80,13 +85,28 @@ unsigned _vectors[] locate_data(".vectors") =
 {
   /* Initial stack */
 
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  0x20020000u, /* Trusted reset stack; __start enters its protected idle stack. */
+#else
   IDLE_STACK,
+#endif
 
   /* Reset exception handler */
 
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  (unsigned)&aw_cpu_reset,
+#else
   (unsigned)&__start,
+#endif
 
   /* Vectors 2 - n point directly at the generic handler */
 
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  [2 ... 6] = (unsigned)&aw_cpu_boot_fault,
+  [7 ... 11] = (unsigned)&aw_cpu_exception_entry,
+  [12] = (unsigned)&aw_cpu_boot_fault,
+  [13 ... (15 + ARMV7M_PERIPHERAL_INTERRUPTS)] = (unsigned)&aw_cpu_exception_entry
+#else
   [2 ... (15 + ARMV7M_PERIPHERAL_INTERRUPTS)] = (unsigned)&exception_common
+#endif
 };

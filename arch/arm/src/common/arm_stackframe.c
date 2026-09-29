@@ -23,6 +23,9 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+#  include <nuttx/trustram_cpu_task.h>
+#endif
 #ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
 #  include <nuttx/trustram_aw_runtime.h>
 #endif
@@ -94,6 +97,17 @@
 
 void *up_stack_frame(struct tcb_s *tcb, size_t frame_size)
 {
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  void *frame = (void *)(uintptr_t)
+    aw_cpu_native_task_carve((uintptr_t)tcb, frame_size);
+  memset(frame, 0, STACK_ALIGN_UP(frame_size));
+  tcb->stack_alloc_ptr = (void *)(uintptr_t)
+    aw_cpu_native_task_allocation((uintptr_t)tcb);
+  tcb->stack_base_ptr = (void *)(uintptr_t)
+    aw_cpu_native_task_base((uintptr_t)tcb);
+  tcb->adj_stack_size = aw_cpu_native_task_bytes((uintptr_t)tcb);
+  return frame;
+#endif
 #ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
   if (TRUSTRAM_AW_RUNTIME_TASK(tcb))
     {

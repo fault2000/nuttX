@@ -85,6 +85,13 @@
 #ifndef CONFIG_SMP
 void up_schedule_sigaction(struct tcb_s *tcb, sig_deliver_t sigdeliver)
 {
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  /* No signal activation/trampoline contract is installed. This terminal
+   * instruction is reached before ordinary frame or delivery-pointer writes. */
+  (void)tcb;
+  (void)sigdeliver;
+  __builtin_trap();
+#else
 #ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
   if (TRUSTRAM_AW_RUNTIME_TASK(tcb))
     {
@@ -223,12 +230,20 @@ void up_schedule_sigaction(struct tcb_s *tcb, sig_deliver_t sigdeliver)
 #endif
         }
     }
+#endif /* CONFIG_ARM_TRUSTRAM_AW_CPU */
 }
 #endif /* !CONFIG_SMP */
 
 #ifdef CONFIG_SMP
 void up_schedule_sigaction(struct tcb_s *tcb, sig_deliver_t sigdeliver)
 {
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  /* No signal activation/trampoline contract is installed. This terminal
+   * instruction is reached before ordinary frame or delivery-pointer writes. */
+  (void)tcb;
+  (void)sigdeliver;
+  __builtin_trap();
+#else
   int cpu;
   int me;
 
@@ -458,5 +473,6 @@ void up_schedule_sigaction(struct tcb_s *tcb, sig_deliver_t sigdeliver)
 #endif
         }
     }
+#endif /* CONFIG_ARM_TRUSTRAM_AW_CPU */
 }
 #endif /* CONFIG_SMP */

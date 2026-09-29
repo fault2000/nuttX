@@ -86,7 +86,9 @@ CHIP_CSRCS += stm32_i2c.c
 endif
 
 ifeq ($(CONFIG_STM32H7_PWR),y)
+ifneq ($(CONFIG_ARM_TRUSTRAM_AW_CPU),y)
 CHIP_CSRCS += stm32_pwr.c
+endif
 endif
 
 ifeq ($(CONFIG_STM32H7_QUADSPI),y)

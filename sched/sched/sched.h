@@ -372,6 +372,7 @@ void nxsched_continue(FAR struct tcb_s *tcb);
 #endif
 
 #if defined(CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS) || \
+    defined(CONFIG_ARM_TRUSTRAM_AW_CPU) || \
     defined(CONFIG_ARM_TRUSTRAM_AW_BOOT) || \
     defined(CONFIG_ARM_TRUSTRAM_NATIVE_BOOT) || \
     defined(TRUSTRAM_BOOT_TASK_PUBLISH_PROBE) || defined(TRUSTRAM_EXIT_NATIVE_INIT_PROBE)

@@ -155,7 +155,14 @@ void arm_stack_color(void *stackbase, size_t nbytes)
 
   /* Take extra care that we do not write outside the stack boundaries */
 
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  /* Preserve the allocated stack pointer while applying the same alignment. */
+
+  stkptr = (uint32_t *)((uint8_t *)stackbase +
+                       ((-(uintptr_t)stackbase) & STACK_ALIGN_MASK));
+#else
   stkptr = (uint32_t *)STACK_ALIGN_UP((uintptr_t)stackbase);
+#endif
 
   if (nbytes == 0) /* 0: colorize the running stack */
     {

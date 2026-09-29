@@ -23,6 +23,9 @@
  *******************************************************************************/
 
 #include <nuttx/config.h>
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+#  include <nuttx/trustram_cpu_task.h>
+#endif
 
 #include <sys/types.h>
 #include <assert.h>
@@ -90,6 +93,16 @@ int nxtask_terminate(pid_t pid, bool nonblocking)
   int cpu;
 #endif
   int ret;
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  /* nxtask_exit also uses this function after selecting the next ready TCB.
+   * Only the physical caller's retained EXITING identity may take that path. */
+  if (!nonblocking)
+    {
+      return -ENOTSUP;
+    }
+
+  const uintptr_t retained = aw_cpu_native_task_self_identity();
+#endif
 
   /* Make sure the task does not become ready-to-run while we are futzing
    * with its TCB.  Within the critical section, no new task may be started
@@ -108,6 +121,16 @@ int nxtask_terminate(pid_t pid, bool nonblocking)
       ret = -ESRCH;
       goto errout_with_lock;
     }
+
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  if ((uintptr_t)dtcb != retained)
+    {
+      ret = -ENOTSUP;
+      goto errout_with_lock;
+    }
+
+  aw_cpu_native_task_release_check((uintptr_t)dtcb);
+#endif
 
   /* Verify our internal sanity */
 

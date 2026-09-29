@@ -43,6 +43,17 @@
 #include "irq/irq.h"
 #include "arm_internal.h"
 
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+/* No ordinary stack walk, raw context capture or MMIO after an invariant
+ * failure. UDF enters the fixed private terminal fault vector. */
+void up_assert(const char *filename, int lineno)
+{
+  (void)filename;
+  (void)lineno;
+  __builtin_trap();
+}
+#else
+
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
@@ -549,3 +560,4 @@ void up_assert(const char *filename, int lineno)
 
   arm_assert();
 }
+#endif /* CONFIG_ARM_TRUSTRAM_AW_CPU */

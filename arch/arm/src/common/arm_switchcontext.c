@@ -25,6 +25,9 @@
 #include <nuttx/config.h>
 
 #include <arch/syscall.h>
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+# include <nuttx/trustram_cpu_task.h>
+#endif
 
 /****************************************************************************
  * Public Functions
@@ -41,7 +44,16 @@
  *
  ****************************************************************************/
 
-#if defined(CONFIG_ARM_TRUSTRAM_COOPERATIVE_TEST) || defined(CONFIG_ARM_TRUSTRAM_NATIVE_BOOT)
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+void arm_switchcontext(uint32_t **saveregs, uint32_t *restoreregs)
+{
+  /* Scheduler queue selection is resolved against protected live bindings.
+   * These ordinary saved-frame pointers never authorize restoration. */
+  (void)saveregs;
+  (void)restoreregs;
+  aw_cpu_native_task_switch();
+}
+#elif defined(CONFIG_ARM_TRUSTRAM_COOPERATIVE_TEST) || defined(CONFIG_ARM_TRUSTRAM_NATIVE_BOOT)
 #  if !defined(CONFIG_BUILD_FLAT) || !defined(CONFIG_ARCH_CORTEXM7) || \
       !defined(CONFIG_ARCH_FPU) || !defined(CONFIG_ARMV7M_USEBASEPRI) || \
       defined(CONFIG_SMP) || defined(CONFIG_ARCH_HIPRI_INTERRUPT)

@@ -107,9 +107,11 @@ typedef struct
  *
  ****************************************************************************/
 
-#if defined(CONFIG_ARCH_HAVE_TESTSET)
+#if defined(CONFIG_ARCH_HAVE_TESTSET) && !defined(CONFIG_ARM_TRUSTRAM_AW_CPU)
 spinlock_t up_testset(volatile FAR spinlock_t *lock);
 #elif !defined(CONFIG_SMP)
+/* CPU protection uses this single-core C implementation: both memory
+ * accesses and the irq-save/restore calls receive the ordinary AW ABI. */
 static inline spinlock_t up_testset(volatile FAR spinlock_t *lock)
 {
   irqstate_t flags;

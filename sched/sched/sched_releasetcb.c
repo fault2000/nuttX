@@ -23,6 +23,9 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+#  include <nuttx/trustram_cpu_task.h>
+#endif
 #ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
 #  include <nuttx/trustram_aw_runtime.h>
 #endif
@@ -101,6 +104,7 @@ static void nxsched_releasepid(pid_t pid)
  ****************************************************************************/
 
 #if defined(CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS) || \
+    defined(CONFIG_ARM_TRUSTRAM_AW_CPU) || \
     defined(CONFIG_ARM_TRUSTRAM_AW_BOOT) || \
     defined(CONFIG_ARM_TRUSTRAM_NATIVE_BOOT) || \
     defined(TRUSTRAM_BOOT_TASK_PUBLISH_PROBE) || defined(TRUSTRAM_EXIT_NATIVE_INIT_PROBE)
@@ -172,6 +176,9 @@ int nxsched_release_tcb(FAR struct tcb_s *tcb, uint8_t ttype)
 
   if (tcb)
     {
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+      aw_cpu_native_task_release_check((uintptr_t)tcb);
+#endif
 #ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
       if (TRUSTRAM_AW_RUNTIME_TASK(tcb))
         {
@@ -262,6 +269,12 @@ int nxsched_release_tcb(FAR struct tcb_s *tcb, uint8_t ttype)
       /* Leave the group (if we did not already leave in task_exithook.c) */
 
       group_leave(tcb);
+
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+      aw_cpu_native_task_cleanup_done((uintptr_t)tcb);
+      aw_cpu_native_task_abort_reclaim((uintptr_t)tcb);
+      return ret;
+#endif
 
       /* And, finally, release the TCB itself */
 

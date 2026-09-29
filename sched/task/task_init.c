@@ -23,6 +23,9 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+#  include <nuttx/trustram_cpu_task.h>
+#endif
 #ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
 #  include <nuttx/trustram_aw_runtime.h>
 #endif
@@ -301,6 +304,30 @@ int nxtask_init(FAR struct task_tcb_s *tcb, const char *name, int priority,
       goto errout_with_group;
     }
 
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  /* argv is data. Only an immutable allowed entry/type pair becomes an
+   * execution identity, retained in the private constructor record. */
+  {
+    uint32_t argc = 1;
+    while (tcb->cmn.group->tg_info->argv[argc] != NULL)
+      {
+        if (++argc > 256u)
+          {
+            ret = -E2BIG;
+            goto errout_with_group;
+          }
+      }
+
+    ret = (int32_t)aw_cpu_native_task_seal(
+      (uintptr_t)tcb, (uintptr_t)entry, argc,
+      (uintptr_t)tcb->cmn.group->tg_info->argv);
+    if (ret < OK)
+      {
+        goto errout_with_group;
+      }
+  }
+#endif
+
   /* Now we have enough in place that we can join the group */
 
 #ifdef CONFIG_ARM_TRUSTRAM_AW_BOOT
@@ -347,6 +374,13 @@ int nxtask_init(FAR struct task_tcb_s *tcb, const char *name, int priority,
   return ret;
 
 errout_with_group:
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  aw_cpu_native_task_cancel((uintptr_t)tcb);
+  if (tcb->cmn.task_state == TSTATE_TASK_INACTIVE)
+    {
+      nxsched_rollback_inactive(&tcb->cmn);
+    }
+#endif
 #ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
   if (TRUSTRAM_AW_RUNTIME_TASK(&tcb->cmn))
     {
@@ -451,6 +485,10 @@ errout_with_group:
 
 void nxtask_uninit(FAR struct task_tcb_s *tcb)
 {
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  aw_cpu_native_task_cancel((uintptr_t)tcb);
+  nxsched_rollback_inactive(&tcb->cmn);
+#endif
 #ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
   if (TRUSTRAM_AW_RUNTIME_TASK((struct tcb_s *)tcb))
     {
@@ -478,7 +516,9 @@ void nxtask_uninit(FAR struct task_tcb_s *tcb)
    * nxtask_setup_scheduler().
    */
 
+#ifndef CONFIG_ARM_TRUSTRAM_AW_CPU
   dq_rem((FAR dq_entry_t *)tcb, (FAR dq_queue_t *)&g_inactivetasks);
+#endif
 #ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
   if (TRUSTRAM_AW_RUNTIME_TASK(&tcb->cmn))
     {

@@ -138,8 +138,37 @@ TRUSTRAM_WORKER_SCOPE int work_thread(int argc, FAR char *argv[])
   irqstate_t flags;
   FAR void *arg;
 
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  /* The native argv copy carries a queue selector, never a printed pointer.
+   * Resolve only the configured static queues before any queue access.
+   */
+
+  if (argc != 2 || argv == NULL || argv[1] == NULL)
+    {
+      return -EINVAL;
+    }
+
+#ifdef CONFIG_SCHED_HPWORK
+  if (strcmp(argv[1], "hp") == 0)
+    {
+      wqueue = (FAR struct kwork_wqueue_s *)&g_hpwork;
+    }
+  else
+#endif
+#ifdef CONFIG_SCHED_LPWORK
+  if (strcmp(argv[1], "lp") == 0)
+    {
+      wqueue = (FAR struct kwork_wqueue_s *)&g_lpwork;
+    }
+  else
+#endif
+    {
+      return -EINVAL;
+    }
+#else
   wqueue = (FAR struct kwork_wqueue_s *)
            ((uintptr_t)strtoul(argv[1], NULL, 0));
+#endif
 
 #ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
   tr_observe_note((uintptr_t)nxsched_self(), TR_OBS_WORKER_ENTRY,
@@ -222,12 +251,36 @@ static int work_thread_create(FAR const char *name, int priority,
                               FAR struct kwork_wqueue_s *wqueue)
 {
   FAR char *argv[2];
+#ifndef CONFIG_ARM_TRUSTRAM_AW_CPU
   char args[32];
+#endif
   int wndx;
   int pid;
 
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+#ifdef CONFIG_SCHED_HPWORK
+  if (wqueue == (FAR struct kwork_wqueue_s *)&g_hpwork &&
+      nthread == CONFIG_SCHED_HPNTHREADS)
+    {
+      argv[0] = "hp";
+    }
+  else
+#endif
+#ifdef CONFIG_SCHED_LPWORK
+  if (wqueue == (FAR struct kwork_wqueue_s *)&g_lpwork &&
+      nthread == CONFIG_SCHED_LPNTHREADS)
+    {
+      argv[0] = "lp";
+    }
+  else
+#endif
+    {
+      return -EINVAL;
+    }
+#else
   snprintf(args, sizeof(args), "0x%" PRIxPTR, (uintptr_t)wqueue);
   argv[0] = args;
+#endif
   argv[1] = NULL;
 
   /* Don't permit any of the threads to run until we have fully initialized

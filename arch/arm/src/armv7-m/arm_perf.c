@@ -29,6 +29,10 @@
 #include "dwt.h"
 #include "itm.h"
 #include "nvic.h"
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+# define AW_CPU_CHIP_INTRINSICS_ONLY 1
+# include "aw_cpu_chip.h"
+#endif
 
 /****************************************************************************
  * Private Data
@@ -43,6 +47,9 @@ static uint32_t g_cpu_freq;
 void up_perf_init(void *arg)
 {
   g_cpu_freq = (uint32_t)(uintptr_t)arg;
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  aw_cpu_perf_init();
+#else
 
   /* Enable ITM and DWT resources, if not left enabled by debugger. */
 
@@ -54,6 +61,7 @@ void up_perf_init(void *arg)
 
   putreg32(0xc5acce55, ITM_LAR);
   modifyreg32(DWT_CTRL, 0, DWT_CTRL_CYCCNTENA_MASK);
+#endif
 }
 
 uint32_t up_perf_getfreq(void)
@@ -63,7 +71,11 @@ uint32_t up_perf_getfreq(void)
 
 uint32_t up_perf_gettime(void)
 {
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  return aw_cpu_perf_count();
+#else
   return getreg32(DWT_CYCCNT);
+#endif
 }
 
 void up_perf_convert(uint32_t elapsed, struct timespec *ts)

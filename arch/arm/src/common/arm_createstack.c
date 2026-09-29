@@ -23,6 +23,9 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+#  include <nuttx/trustram_cpu_task.h>
+#endif
 #ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
 #  include <nuttx/trustram_aw_runtime.h>
 #endif
@@ -98,6 +101,29 @@
 
 int up_create_stack(struct tcb_s *tcb, size_t stack_size, uint8_t ttype)
 {
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+#  if defined(CONFIG_TLS_ALIGNED) || defined(CONFIG_MM_KERNEL_HEAP)
+#    error "CPU constructor requires the admitted flat 8-byte allocator ABI"
+#  endif
+  /* The exact compiler CAPTURE claims this allocation before any ordinary
+   * publication, coloration or TLS writes. TCB fields are only mirrors. */
+  if (aw_cpu_native_stack_allocate(stack_size) == NULL)
+    {
+      return ERROR;
+    }
+
+  tcb->stack_alloc_ptr = (void *)(uintptr_t)
+    aw_cpu_native_task_allocation((uintptr_t)tcb);
+  tcb->stack_base_ptr = (void *)(uintptr_t)
+    aw_cpu_native_task_base((uintptr_t)tcb);
+  tcb->adj_stack_size = aw_cpu_native_task_bytes((uintptr_t)tcb);
+  tcb->flags |= TCB_FLAG_FREE_STACK;
+#  ifdef CONFIG_STACK_COLORATION
+  arm_stack_color(tcb->stack_base_ptr, tcb->adj_stack_size);
+#  endif
+  board_autoled_on(LED_STACKCREATED);
+  return OK;
+#endif
 #ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
   if (TRUSTRAM_AW_RUNTIME_TASK(tcb))
     {

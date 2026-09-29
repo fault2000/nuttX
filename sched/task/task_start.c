@@ -23,6 +23,9 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+#  include <nuttx/trustram_cpu_task.h>
+#endif
 #ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
 #  include <nuttx/trustram_aw_runtime.h>
 #endif
@@ -64,6 +67,12 @@
 
 #define MAX_START_ARGS 256
 
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+/* Internal libc startup contract, also declared in libs/libc/libc.h. */
+
+void lib_cxx_initialize(void);
+#endif
+
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
@@ -101,7 +110,44 @@ void nxtask_start(void) { board_trustram_boot_task_handoff_startup_probe(); }
 
 void nxtask_start(void)
 {
-#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  /* Keep the native task/kernel startup distinction, using the retained
+   * creation record rather than the writable TCB flags.  Pthreads have their
+   * own initial entry and must never pass through this root. */
+
+  const uint32_t type = aw_cpu_native_task_self_type();
+
+  if (type != 1u && type != 3u)
+    {
+      __builtin_trap();
+    }
+
+#ifdef CONFIG_SIG_DEFAULT
+  if (type == 1u)
+    {
+      FAR struct tcb_s *tcb =
+        (FAR struct tcb_s *)(uintptr_t)aw_cpu_native_task_self_identity();
+      nxsig_default_initialize(tcb);
+    }
+#endif
+
+  main_t entry = (main_t)(uintptr_t)aw_cpu_native_task_self_entry();
+  int argc = (int)aw_cpu_native_task_self_argc();
+  char **argv = (char **)(uintptr_t)aw_cpu_native_task_self_argv();
+
+  if (type == 1u)
+    {
+      /* Same libc initialization used by nxtask_startup().  Keep the actual
+       * retained entry call here so its fixed indirect source site remains
+       * the native-entry policy boundary. */
+
+      lib_cxx_initialize();
+    }
+
+  /* The final indirect template rechecks this physical target against the
+   * retained entry of this activation; the ordinary local is only a mirror. */
+  exit(entry(argc, argv));
+#elif defined(CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS)
   FAR struct tcb_s *tcb = this_task();
   struct trustram_task_start_s plan;
 

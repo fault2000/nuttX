@@ -22,13 +22,18 @@
 
 include common/Make.defs
 
-CMN_ASRCS += arm_exception.S
+ifneq ($(CONFIG_ARM_TRUSTRAM_AW_CPU),y)
+  CMN_ASRCS += arm_exception.S
+endif
 
-CMN_CSRCS += arm_busfault.c arm_cache.c arm_doirq.c
-CMN_CSRCS += arm_hardfault.c arm_initialstate.c arm_itm.c
-CMN_CSRCS += arm_memfault.c arm_perf.c
-CMN_CSRCS += arm_schedulesigaction.c arm_sigdeliver.c
-CMN_CSRCS += arm_svcall.c arm_systemreset.c arm_tcbinfo.c
+CMN_CSRCS += arm_doirq.c arm_initialstate.c arm_itm.c arm_perf.c
+CMN_CSRCS += arm_schedulesigaction.c arm_systemreset.c arm_tcbinfo.c
+ifneq ($(CONFIG_ARM_TRUSTRAM_AW_CPU),y)
+  # CPU reset owns cache/FPU setup; fixed vectors terminate faults directly.
+  # Raw saved-frame restoration and asynchronous signal rewriting are absent.
+  CMN_CSRCS += arm_busfault.c arm_cache.c arm_hardfault.c arm_memfault.c
+  CMN_CSRCS += arm_sigdeliver.c arm_svcall.c
+endif
 CMN_CSRCS += arm_trigger_irq.c arm_usagefault.c arm_vectors.c
 
 ifeq ($(CONFIG_ARMV7M_SYSTICK),y)
@@ -44,7 +49,9 @@ ifeq ($(CONFIG_ARMV7M_STACKCHECK),y)
 endif
 
 ifeq ($(CONFIG_ARCH_FPU),y)
+ifneq ($(CONFIG_ARM_TRUSTRAM_AW_CPU),y)
   CMN_CSRCS += arm_fpuconfig.c
+endif
   CMN_CSRCS += arm_fpucmp.c
 endif
 

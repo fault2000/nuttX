@@ -23,6 +23,9 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+#  include <errno.h>
+#endif
 #ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
 #  include <nuttx/trustram_aw_runtime.h>
 #endif
@@ -91,6 +94,14 @@
 
 int up_use_stack(struct tcb_s *tcb, void *stack, size_t stack_size)
 {
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  /* Arbitrary ordinary pointers are not allocation tickets. The idle stack
+   * is installed by the reset prefix; new tasks use captured allocator output. */
+  (void)tcb;
+  (void)stack;
+  (void)stack_size;
+  return -ENOTSUP;
+#else
 #ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
   if (TRUSTRAM_AW_RUNTIME_TASK(tcb))
     {
@@ -193,4 +204,5 @@ int up_use_stack(struct tcb_s *tcb, void *stack, size_t stack_size)
   return OK;
 #endif /* CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS */
 #endif /* TRUSTRAM_EXIT_NATIVE_INIT_PROBE */
+#endif /* CONFIG_ARM_TRUSTRAM_AW_CPU */
 }

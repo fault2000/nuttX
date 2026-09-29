@@ -33,6 +33,9 @@
 
 #include "arm_internal.h"
 #include "hardware/stm32_flash.h"
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+#  include "hardware/stm32_syscfg.h"
+#endif
 #include "stm32_gpio.h"
 #include "stm32_rcc.h"
 #include "stm32_pwr.h"
@@ -54,6 +57,13 @@
 
 /* Include chip-specific clocking initialization logic */
 
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+#  if defined(CONFIG_STM32H7_RTC) || defined(CONFIG_STM32H7_IWDG) || \
+      defined(CONFIG_PM) || defined(CONFIG_STM32H7_CUSTOM_CLOCKCONFIG)
+#    error "CPU reset-only RCC closure excludes RTC/watchdog/PM/custom clocks"
+#  endif
+#  define stm32_stdclockconfig aw_cpu_stdclockconfig
+#endif
 #if defined(CONFIG_STM32H7_STM32H7X3XX)
 #  include "stm32h7x3xx_rcc.c"
 #elif defined(CONFIG_STM32H7_STM32H7B3XX)
@@ -91,6 +101,38 @@
  *
  ****************************************************************************/
 
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+/* Called only by the trusted reset prefix, before any ordinary compiled C.
+ * Entire source and its fixed iocompensation helper form a no-FP private boot
+ * closure. There is no runtime clockconfig entry or ordinary dynamic selector.
+ * No scheduler/global backup-counter calls are made before BSS initialization.
+ */
+#ifdef CONFIG_STM32H7_SYSCFG_IOCOMPENSATION
+static void aw_cpu_iocompensation_boot(void)
+{
+  /* The same fixed compensation operation as the native reset path. Keep it
+   * in this reset-only source: runtime GPIO APIs remain instrumented services.
+   */
+  putreg32(SYSCFG_CCCSR_EN, STM32_SYSCFG_CCCSR);
+  while ((getreg32(STM32_SYSCFG_CCCSR) & SYSCFG_CCCSR_READY) == 0)
+    {
+    }
+}
+#endif
+
+void aw_cpu_clock_boot(void)
+{
+  uint32_t regval;
+  rcc_reset();
+  regval = getreg32(STM32_PWR_CR1);
+  putreg32(regval & ~PWR_CR1_DBP, STM32_PWR_CR1);
+  stm32_stdclockconfig();
+  rcc_enableperipherals();
+#ifdef CONFIG_STM32H7_SYSCFG_IOCOMPENSATION
+  aw_cpu_iocompensation_boot();
+#endif
+}
+#else
 void stm32_clockconfig(void)
 {
   /* Make sure that we are starting in the reset state */
@@ -130,6 +172,8 @@ void stm32_clockconfig(void)
   stm32_iocompensation();
 #endif
 }
+
+#endif /* CONFIG_ARM_TRUSTRAM_AW_CPU */
 
 /****************************************************************************
  * Name: stm32_clockenable

@@ -31,6 +31,10 @@
 
 #include "arm_internal.h"
 #include "nvic.h"
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+# define AW_CPU_CHIP_INTRINSICS_ONLY 1
+# include "aw_cpu_chip.h"
+#endif
 
 /****************************************************************************
  * Public Functions
@@ -46,6 +50,9 @@
 
 void up_systemreset(void)
 {
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  aw_cpu_system_reset();
+#else
   uint32_t regval;
 
   /* Set up for the system reset, retaining the priority group from the
@@ -63,4 +70,5 @@ void up_systemreset(void)
   /* Wait for the reset */
 
   for (; ; );
+#endif
 }

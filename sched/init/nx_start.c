@@ -335,7 +335,21 @@ uint8_t g_nx_initstate;  /* See enum nx_initstate_e */
  * bringing up the rest of the system.
  */
 
-static struct task_tcb_s g_idletcb[CONFIG_SMP_NCPUS];
+static struct task_tcb_s g_idletcb[CONFIG_SMP_NCPUS]
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  __attribute__((aligned(8)))
+#endif
+;
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+/* Immutable exact allocator object for reset-before-BSS idle admission. */
+#ifdef CONFIG_SCHED_THREAD_LOCAL
+# error "CPU idle boot requires a generated complete TLS extent"
+#endif
+const uint32_t g_aw_cpu_idle_object[3]
+  __attribute__((section(".rodata.aw_cpu_idle_object"), used)) =
+  { (uint32_t)(uintptr_t)&g_idletcb[0], sizeof(g_idletcb[0]),
+    sizeof(struct tls_info_s) };
+#endif
 
 #ifdef CONFIG_ARM_TRUSTRAM_AW_BOOT
 /* Exact source identity for the bounded AW task's first switch and exit. */

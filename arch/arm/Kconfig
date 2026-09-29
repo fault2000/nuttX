@@ -1309,6 +1309,22 @@ endif
 if ARCH_CHIP_TLSR82
 source "arch/arm/src/tlsr82/Kconfig"
 endif
+config ARM_TRUSTRAM_AW_CPU
+	bool "TRUST-RAM AW whole-image CPU ABI (requires protected producer)"
+	default n
+	depends on BUILD_FLAT && ARCH_CORTEXM7 && ARCH_FPU && ARMV7M_USEBASEPRI
+	depends on ARM_MPU && !SMP && !ARCH_HIPRI_INTERRUPT
+	depends on !ARCH_RAMVECTORS && !SUPPRESS_INTERRUPTS
+	depends on !ARM_TRUSTRAM_AW_BOOT && !ARM_TRUSTRAM_NATIVE_BOOT
+	depends on !ARM_TRUSTRAM_COOPERATIVE_TEST && !ARCH_TRUSTRAM_CONTEXT_HOOKS
+	help
+	  General AW CPU ABI for a separately admitted whole-image build. All
+	  ordinary code, native archives and runtime helpers must use the pinned
+	  compiler ABI; reset, IRQ, allocation and typed device entries require
+	  matching immutable final-image policies. Enable this only through the
+	  protected image builder, not in the unprotected size profile.
+	  Setting this option alone does not enable or prove CPU protection.
+
 config ARM_TRUSTRAM_COOPERATIVE_TEST
 	bool "TRUST-RAM manual cooperative context diagnostic"
 	default n

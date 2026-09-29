@@ -23,6 +23,9 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+#  include <nuttx/trustram_cpu_task.h>
+#endif
 #ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
 #  include <nuttx/trustram_aw_runtime.h>
 #endif
@@ -157,11 +160,21 @@ void up_exit(int status)
 #endif
 #else
 
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  /* Group/file cleanup may block. Complete its idempotent native hook while
+   * the physical caller is still the current scheduler task. The later
+   * nonblocking termination pass observes EXIT_PROCESSING and does no work. */
+  nxtask_exithook(tcb, status, true);
+#endif
+
   /* Make sure that we are in a critical section with local interrupts.
    * The IRQ state will be restored when the next task is started.
    */
 
   enter_critical_section();
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  aw_cpu_native_task_stop((uintptr_t)tcb);
+#endif
 
 #ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
   /* Retain the outgoing lifetime before native teardown changes this_task. */
@@ -192,6 +205,9 @@ void up_exit(int status)
    */
 
   nxsched_resume_scheduler(tcb);
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  aw_cpu_native_task_exit();
+#endif
 
   /* Then switch contexts */
 

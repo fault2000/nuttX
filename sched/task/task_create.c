@@ -23,6 +23,9 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+#  include <nuttx/trustram_cpu_task.h>
+#endif
 
 #ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
 #  include <nuttx/trustram_observe.h>
@@ -31,6 +34,7 @@
 #include <sys/types.h>
 #include <sched.h>
 #include <errno.h>
+#include <string.h>
 #include <debug.h>
 
 #include <nuttx/arch.h>
@@ -86,7 +90,13 @@ static int nxthread_create(FAR const char *name, uint8_t ttype,
 
   /* Allocate a TCB for the new task. */
 
-#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  tcb = aw_cpu_native_tcb_allocate((uint32_t)ttype + 1u);
+  if (tcb != NULL)
+    {
+      memset(tcb, 0, sizeof(*tcb));
+    }
+#elif defined(CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS)
   tcb = up_trustram_tcb_alloc(sizeof(struct task_tcb_s), ttype);
 #else
   tcb = (FAR struct task_tcb_s *)kmm_zalloc(sizeof(struct task_tcb_s));
@@ -111,7 +121,11 @@ static int nxthread_create(FAR const char *name, uint8_t ttype,
       struct tr_observe_token observation =
         tr_observe_releasing((uintptr_t)tcb);
 #endif
-#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+      aw_cpu_native_task_cancel((uintptr_t)tcb);
+      aw_cpu_native_task_cleanup_done((uintptr_t)tcb);
+      aw_cpu_native_task_abort_reclaim((uintptr_t)tcb);
+#elif defined(CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS)
       up_trustram_context_free_tcb(&tcb->cmn);
 #else
       kmm_free(tcb);

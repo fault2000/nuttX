@@ -183,9 +183,19 @@ void up_initial_state(struct tcb_s *tcb)
 
   /* Initialize the context registers to stack top */
 
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  /* Keep the initial frame within the allocated stack's pointer provenance.
+   * The native stack setup has reserved the complete exception frame.
+   */
+
+  xcp->regs = (void *)((uint8_t *)tcb->stack_base_ptr +
+                                tcb->adj_stack_size -
+                                XCPTCONTEXT_SIZE);
+#else
   xcp->regs = (void *)((uint32_t)tcb->stack_base_ptr +
                                  tcb->adj_stack_size -
                                  XCPTCONTEXT_SIZE);
+#endif
 
   /* Initialize the xcp registers */
 

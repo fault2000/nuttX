@@ -23,6 +23,9 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+#  include <nuttx/trustram_cpu_task.h>
+#endif
 #ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
 #  include <nuttx/trustram_aw_runtime.h>
 #endif
@@ -79,6 +82,9 @@ void nxtask_activate(FAR struct tcb_s *tcb)
 #endif
 
   irqstate_t flags = enter_critical_section();
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  aw_cpu_native_task_started((uintptr_t)tcb);
+#endif
 
 #ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
   if (TRUSTRAM_AW_RUNTIME_TASK(tcb))

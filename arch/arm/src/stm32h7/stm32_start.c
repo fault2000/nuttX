@@ -197,7 +197,9 @@ void __start(void)
 
   /* If enabled reset the MPU */
 
+#ifndef CONFIG_ARM_TRUSTRAM_AW_CPU
   mpu_early_reset();
+#endif
 
 /* Clear .bss.  We'll do this inline (vs. calling memset) just to be
    * certain that there are no issues with the state of global variables.
@@ -241,14 +243,18 @@ void __start(void)
   nx_start();
 #endif
 
+#ifndef CONFIG_ARM_TRUSTRAM_AW_CPU
   stm32_clockconfig();
   arm_fpuconfig();
+#endif
   stm32_lowsetup();
   showprogress('A');
 
   /* Enable/disable tightly coupled memories */
 
+#ifndef CONFIG_ARM_TRUSTRAM_AW_CPU
   stm32_tcmenable();
+#endif
 
   /* Initialize onboard resources */
 
@@ -257,8 +263,10 @@ void __start(void)
 
   /* Enable I- and D-Caches */
 
+#ifndef CONFIG_ARM_TRUSTRAM_AW_CPU
   up_enable_icache();
   up_enable_dcache();
+#endif
   showprogress('C');
 
   /* Perform early serial initialization */

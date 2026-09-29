@@ -379,10 +379,16 @@ static inline void raisebasepri(uint32_t basepri)
 
 /* Disable IRQs */
 
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+#  include <nuttx/trustram_cpu_masks.h>
+#endif
+
 static inline void up_irq_disable(void) inline_function;
 static inline void up_irq_disable(void)
 {
-#ifdef CONFIG_ARMV7M_USEBASEPRI
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  aw_cpu_native_irq_disable();
+#elif defined(CONFIG_ARMV7M_USEBASEPRI)
   /* Probably raising priority */
 
   raisebasepri(NVIC_SYSH_DISABLE_PRIORITY);
@@ -396,7 +402,9 @@ static inline void up_irq_disable(void)
 static inline irqstate_t up_irq_save(void) inline_function;
 static inline irqstate_t up_irq_save(void)
 {
-#ifdef CONFIG_ARMV7M_USEBASEPRI
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  return (irqstate_t)aw_cpu_native_irq_save();
+#elif defined(CONFIG_ARMV7M_USEBASEPRI)
   /* Probably raising priority */
 
   uint8_t basepri = getbasepri();
@@ -428,10 +436,14 @@ static inline irqstate_t up_irq_save(void)
 static inline void up_irq_enable(void) inline_function;
 static inline void up_irq_enable(void)
 {
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  aw_cpu_native_irq_enable();
+#else
   /* In this case, we are always retaining or lowering the priority value */
 
   setbasepri(NVIC_SYSH_PRIORITY_MIN);
   __asm__ __volatile__ ("\tcpsie  i\n");
+#endif
 }
 
 /* Restore saved primask state */
@@ -439,7 +451,9 @@ static inline void up_irq_enable(void)
 static inline void up_irq_restore(irqstate_t flags) inline_function;
 static inline void up_irq_restore(irqstate_t flags)
 {
-#ifdef CONFIG_ARMV7M_USEBASEPRI
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  aw_cpu_native_irq_restore((uint32_t)flags);
+#elif defined(CONFIG_ARMV7M_USEBASEPRI)
   /* In this case, we are always retaining or lowering the priority value */
 
   setbasepri((uint32_t)flags);

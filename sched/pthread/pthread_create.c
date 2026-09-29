@@ -23,6 +23,9 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+#  include <nuttx/trustram_cpu_task.h>
+#endif
 
 #ifdef CONFIG_SCHED_TRUSTRAM_OBSERVE
 #  include <nuttx/trustram_observe.h>
@@ -158,7 +161,21 @@ static inline void pthread_addjoininfo(FAR struct task_group_s *group,
 
 static void pthread_start(void)
 {
-#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  FAR struct pthread_tcb_s *ptcb = (FAR struct pthread_tcb_s *)(uintptr_t)
+    aw_cpu_native_task_self_identity();
+  if (ptcb->cmn.sched_priority > ptcb->cmn.init_priority)
+    {
+      DEBUGVERIFY(nxsched_set_priority(&ptcb->cmn, ptcb->cmn.init_priority));
+    }
+
+  pthread_startroutine_t entry = (pthread_startroutine_t)(uintptr_t)
+    aw_cpu_native_task_self_entry();
+  pthread_addr_t arg = (pthread_addr_t)(uintptr_t)
+    aw_cpu_native_task_self_argv();
+  /* Flat-build pthread_trampoline performs exactly this call and exit. */
+  pthread_exit(entry(arg));
+#elif defined(CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS)
   FAR struct tcb_s *tcb = this_task();
   FAR struct pthread_tcb_s *ptcb;
   struct trustram_pthread_start_s plan;
@@ -258,10 +275,13 @@ int nx_pthread_create(pthread_trampoline_t trampoline, FAR pthread_t *thread,
   pid_t pid;
   int ret;
   bool group_joined = false;
+#if defined(CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS) || defined(CONFIG_ARM_TRUSTRAM_AW_CPU)
+  bool joinsem_initialized = false;
+#endif
 #ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
   bool context_prepared = false;
   bool scheduler_published = false;
-  bool joinsem_initialized = false;
+
 #endif
 
   DEBUGASSERT(trampoline != NULL);
@@ -275,7 +295,13 @@ int nx_pthread_create(pthread_trampoline_t trampoline, FAR pthread_t *thread,
 
   /* Allocate a TCB for the new task. */
 
-#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  ptcb = aw_cpu_native_tcb_allocate(TCB_FLAG_TTYPE_PTHREAD + 1u);
+  if (ptcb != NULL)
+    {
+      memset(ptcb, 0, sizeof(*ptcb));
+    }
+#elif defined(CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS)
   ptcb = up_trustram_tcb_alloc(sizeof(struct pthread_tcb_s),
                              TCB_FLAG_TTYPE_PTHREAD);
 #else
@@ -585,6 +611,17 @@ int nx_pthread_create(pthread_trampoline_t trampoline, FAR pthread_t *thread,
     }
 #endif
 
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  ret = (int32_t)aw_cpu_native_task_seal((uintptr_t)ptcb,
+                                      (uintptr_t)entry, 1u,
+                                      (uintptr_t)arg);
+  if (ret < OK)
+    {
+      errcode = -ret;
+      goto errout_with_join;
+    }
+#endif
+
   pid = ptcb->cmn.pid;
   pjoin->thread = (pthread_t)pid;
 
@@ -592,7 +629,7 @@ int nx_pthread_create(pthread_trampoline_t trampoline, FAR pthread_t *thread,
 
   ret = nxsem_init(&pjoin->exit_sem, 0, 0);
 
-#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+#if defined(CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS) || defined(CONFIG_ARM_TRUSTRAM_AW_CPU)
   joinsem_initialized = ret == OK;
 #endif
 
@@ -678,7 +715,7 @@ int nx_pthread_create(pthread_trampoline_t trampoline, FAR pthread_t *thread,
   else
     {
       sched_unlock();
-#ifndef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+#if !defined(CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS) && !defined(CONFIG_ARM_TRUSTRAM_AW_CPU)
       dq_rem((FAR dq_entry_t *)ptcb, (FAR dq_queue_t *)&g_inactivetasks);
       nxsem_destroy(&pjoin->exit_sem);
 #endif
@@ -690,7 +727,7 @@ int nx_pthread_create(pthread_trampoline_t trampoline, FAR pthread_t *thread,
   return ret;
 
 errout_with_join:
-#ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
+#if defined(CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS) || defined(CONFIG_ARM_TRUSTRAM_AW_CPU)
   if (joinsem_initialized)
     {
       nxsem_destroy(&pjoin->exit_sem);
@@ -701,6 +738,13 @@ errout_with_join:
   ptcb->joininfo = NULL;
 
 errout_with_tcb:
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  aw_cpu_native_task_cancel((uintptr_t)ptcb);
+  if (ptcb->cmn.task_state == TSTATE_TASK_INACTIVE)
+    {
+      nxsched_rollback_inactive(&ptcb->cmn);
+    }
+#endif
 
 #ifdef CONFIG_ARCH_TRUSTRAM_CONTEXT_HOOKS
   if (scheduler_published)

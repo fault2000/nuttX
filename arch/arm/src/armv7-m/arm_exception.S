@@ -141,6 +141,9 @@
 	.thumb_func
 	.type	exception_common, function
 exception_common:
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+	b.w aw_cpu_exception_entry
+#endif
 #ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
 	b.w board_aw_runtime_exception
 	.global board_aw_runtime_native_exception

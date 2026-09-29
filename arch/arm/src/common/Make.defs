@@ -21,13 +21,36 @@
 # Common ARM files
 
 CMN_CSRCS += arm_allocateheap.c arm_assert.c arm_blocktask.c
-CMN_CSRCS += arm_createstack.c arm_exit.c arm_fullcontextrestore.c
+CMN_CSRCS += arm_createstack.c arm_exit.c
+ifneq ($(CONFIG_ARM_TRUSTRAM_AW_CPU),y)
+  CMN_CSRCS += arm_fullcontextrestore.c arm_saveusercontext.c
+endif
 CMN_CSRCS += arm_initialize.c arm_lowputs.c
 CMN_CSRCS += arm_modifyreg16.c arm_modifyreg32.c
 CMN_CSRCS += arm_modifyreg8.c arm_nputs.c arm_releasepending.c
-CMN_CSRCS += arm_releasestack.c arm_reprioritizertr.c arm_saveusercontext.c
+CMN_CSRCS += arm_releasestack.c arm_reprioritizertr.c
 CMN_CSRCS += arm_stackframe.c arm_switchcontext.c
-CMN_CSRCS += arm_vfork.c arm_unblocktask.c arm_usestack.c
+CMN_CSRCS += arm_unblocktask.c arm_usestack.c
+ifeq ($(CONFIG_ARCH_HAVE_VFORK),y)
+ifneq ($(CONFIG_ARM_TRUSTRAM_AW_CPU),y)
+  CMN_CSRCS += arm_vfork.c
+endif
+endif
+
+ifeq ($(CONFIG_ARM_TRUSTRAM_AW_CPU),y)
+  AW_CPU_SOURCE_DIR := $(TOPDIR)/../../src/px4/common/trustram
+  VPATH += $(AW_CPU_SOURCE_DIR)
+  CFLAGS += -I$(AW_CPU_SOURCE_DIR)
+  CMN_CSRCS += aw_cpu_native_masks.c aw_cpu_native_alloc.c aw_cpu_native_task.c
+  CMN_CSRCS += aw_cpu_irq_bridge.c aw_cpu_native_heap.c
+  # Only these bounded private adapters have uninstrumented no-FP code. The
+  # final image builder replaces/adjudicates them separately from ordinary
+  # source-pinned native wrappers; no native heap/scheduler closure is exempt.
+  aw_cpu_irq_bridge$(OBJEXT) aw_cpu_native_heap$(OBJEXT): CFLAGS += \
+    -I$(TOPDIR)/mm -DAW_CONTEXT_GENERAL_PROFILE=1 \
+    -DAW_MAX_OWNERS=40 -DAW_MAX_ACTIVATIONS=48 \
+    -ffreestanding -fno-builtin -mgeneral-regs-only -ffixed-r9 -ffixed-r10
+endif
 
 ifneq ($(CONFIG_ALARM_ARCH),y)
   ifneq ($(CONFIG_TIMER_ARCH),y)
@@ -75,11 +98,17 @@ ifeq ($(CONFIG_SCHED_BACKTRACE),y)
   endif
 endif
 
-CMN_ASRCS += vfork.S
+ifeq ($(CONFIG_ARCH_HAVE_VFORK),y)
+ifneq ($(CONFIG_ARM_TRUSTRAM_AW_CPU),y)
+  CMN_ASRCS += vfork.S
+endif
+endif
 
 ifeq ($(CONFIG_ARCH_HAVE_TESTSET),y)
   ifeq ($(CONFIG_ARCH_ARMV6M),)
+  ifneq ($(CONFIG_ARM_TRUSTRAM_AW_CPU),y)
     CMN_ASRCS += arm_testset.S
+  endif
   endif
 endif
 

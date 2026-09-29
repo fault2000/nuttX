@@ -23,6 +23,9 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+#  include <nuttx/trustram_cpu_task.h>
+#endif
 #ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
 #  include <nuttx/trustram_aw_runtime.h>
 #endif
@@ -74,6 +77,14 @@ void up_block_task(struct tcb_s *tcb, tstate_t task_state)
 {
   struct tcb_s *rtcb = this_task();
   bool switch_needed;
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+  /* A final exit pass must never block after ready-list ownership changes.
+   * Normal semaphore/sleep blocking keeps the physical caller at its head. */
+  if ((uintptr_t)rtcb != aw_cpu_native_task_self_identity())
+    {
+      __builtin_trap();
+    }
+#endif
 
 #ifdef CONFIG_ARM_TRUSTRAM_AW_RUNTIME
   /* Native creation/cleanup can acquire heap, file, or driver locks on the
