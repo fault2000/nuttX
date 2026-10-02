@@ -43,13 +43,17 @@ ifeq ($(CONFIG_ARM_TRUSTRAM_AW_CPU),y)
   CFLAGS += -I$(AW_CPU_SOURCE_DIR)
   CMN_CSRCS += aw_cpu_native_masks.c aw_cpu_native_alloc.c aw_cpu_native_task.c
   CMN_CSRCS += aw_cpu_irq_bridge.c aw_cpu_native_heap.c
-  # Only these bounded private adapters have uninstrumented no-FP code. The
-  # final image builder replaces/adjudicates them separately from ordinary
-  # source-pinned native wrappers; no native heap/scheduler closure is exempt.
-  aw_cpu_irq_bridge$(OBJEXT) aw_cpu_native_heap$(OBJEXT): CFLAGS += \
+  # These private adapters use the exact core layout and checked T-store
+  # compiler action. Other native wrappers retain the ordinary image producer.
+  AW_CPU_PRIVATE_COBJS += aw_cpu_irq_bridge$(OBJEXT) aw_cpu_native_heap$(OBJEXT)
+  AW_CPU_STORE_TOOL := $(abspath $(TOPDIR)/../../../../Tools/trustram/aw_cpu_private_stores.py)
+  AW_CPU_STORE_PYTHON ?= python3
+  aw_cpu_irq_bridge$(OBJEXT) aw_cpu_native_heap$(OBJEXT) aw_cpu_irq_bridge.ddc aw_cpu_native_heap.ddc: CFLAGS += \
     -I$(TOPDIR)/mm -DAW_CONTEXT_GENERAL_PROFILE=1 \
     -DAW_MAX_OWNERS=40 -DAW_MAX_ACTIVATIONS=48 \
-    -ffreestanding -fno-builtin -mgeneral-regs-only -ffixed-r9 -ffixed-r10
+    -DAW_CPU_FIXED_MPU_READBACK=1 -DAW_CPU_PRIVATE_TSTORES=1 \
+    -ffreestanding -fno-builtin -fno-tree-loop-distribute-patterns \
+    -mgeneral-regs-only -ffixed-r9 -ffixed-r10 -ffixed-r12
 endif
 
 ifneq ($(CONFIG_ALARM_ARCH),y)

@@ -128,8 +128,20 @@ all: $(HEAD_OBJ) $(BIN)
 $(AOBJS) $(UAOBJS) $(HEAD_OBJ): %$(OBJEXT): %.S
 	$(call ASSEMBLE, $<, $@)
 
-$(COBJS) $(UCOBJS): %$(OBJEXT): %.c
+$(filter-out $(AW_CPU_PRIVATE_COBJS),$(COBJS) $(UCOBJS)): %$(OBJEXT): %.c
 	$(call COMPILE, $<, $@)
+
+ifneq ($(AW_CPU_PRIVATE_COBJS),)
+# A cached native object must be rebuilt when the private compiler action or
+# its CPU-only flags change, even when the C source itself is unchanged.
+$(AW_CPU_PRIVATE_COBJS): Makefile common/Make.defs chip/Make.defs \
+  $(AW_CPU_STORE_TOOL) $(dir $(AW_CPU_STORE_TOOL))instruction_effects.py \
+  $(dir $(AW_CPU_STORE_TOOL))classify_aw_cpu_private_stores.py
+stm32_rcc$(OBJEXT): $(AW_CPU_SOURCE_DIR)/aw_cpu_clock_mmio.h
+$(AW_CPU_PRIVATE_COBJS): %$(OBJEXT): %.c
+	@echo "CC/T: $<"
+	$(Q) $(AW_CPU_STORE_PYTHON) $(AW_CPU_STORE_TOOL) -- $(CC) -c $(CFLAGS) $($(strip $<)_CFLAGS) $< -o $@
+endif
 
 ifeq ($(CONFIG_BUILD_FLAT),y)
 $(BIN): $(OBJS)
@@ -211,6 +223,11 @@ ifeq ($(BOARDMAKE),y)
 endif
 	$(call DELFILE, $(KBIN))
 	$(call DELFILE, $(BIN))
+ifneq ($(AW_CPU_PRIVATE_COBJS),)
+	$(call DELFILE, $(addsuffix .aw-raw.s,$(AW_CPU_PRIVATE_COBJS)))
+	$(call DELFILE, $(addsuffix .aw-tstores.s,$(AW_CPU_PRIVATE_COBJS)))
+	$(call DELFILE, $(addsuffix .aw-tstores.json,$(AW_CPU_PRIVATE_COBJS)))
+endif
 ifneq ($(EXTRADELFILE),)
 	$(call DELFILE, $(EXTRADELFILE))
 endif

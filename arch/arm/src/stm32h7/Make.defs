@@ -35,6 +35,15 @@ CHIP_CSRCS += stm32_allocateheap.c stm32_exti_gpio.c stm32_gpio.c stm32_irq.c
 CHIP_CSRCS += stm32_start.c stm32_rcc.c stm32_lowputc.c stm32_serial.c
 CHIP_CSRCS += stm32_uid.c
 
+ifeq ($(CONFIG_ARM_TRUSTRAM_AW_CPU),y)
+  AW_CPU_PRIVATE_COBJS += stm32_rcc$(OBJEXT)
+  stm32_rcc$(OBJEXT) stm32_rcc.ddc: CFLAGS += \
+    -DAW_CPU_FIXED_MPU_READBACK=1 -DAW_CPU_PRIVATE_TSTORES=1 \
+    -ffreestanding -fno-builtin -fno-tree-loop-distribute-patterns \
+    -mgeneral-regs-only -ffixed-r9 -ffixed-r10 -ffixed-r12 \
+    -include $(AW_CPU_SOURCE_DIR)/aw_cpu_clock_mmio.h
+endif
+
 ifeq ($(CONFIG_SCHED_TICKLESS),y)
 CHIP_CSRCS += stm32_tickless.c
 else
