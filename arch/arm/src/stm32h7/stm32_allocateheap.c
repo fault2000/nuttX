@@ -182,6 +182,9 @@ const uintptr_t g_board_axi_heap_end = AXI_HEAP_END;
 #elif BOARD_DTCM_RSVD_TAIL_SIZE > 0
 #  if !defined(HAVE_DTCM) || !defined(CONFIG_ARMV7M_DTCM)
 #    error "BOARD_DTCM_RSVD_TAIL_SIZE requires enabled general-heap DTCM"
+#  elif defined(AW_CPU_INLINE_FIRMWARE_EXPERIMENT) && \
+        BOARD_DTCM_RSVD_TAIL_SIZE == (DTCM_END - DTCM_START)
+/* Physical inline SERVICE backing occupies the final ordinary DTCM slice. */
 #  elif BOARD_DTCM_RSVD_TAIL_SIZE >= (DTCM_END - DTCM_START)
 #    error "BOARD_DTCM_RSVD_TAIL_SIZE must leave a nonempty DTCM heap"
 #  endif
@@ -448,7 +451,7 @@ void arm_addregion(void)
     }
 #endif
 
-#ifdef HAVE_DTCM
+#if defined(HAVE_DTCM) && !defined(AW_CPU_INLINE_FIRMWARE_EXPERIMENT)
   if (mm_regions < CONFIG_MM_REGIONS)
     {
 #if BOARD_DTCM_RSVD_TAIL_SIZE > 0
