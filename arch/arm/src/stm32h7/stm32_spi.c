@@ -49,6 +49,7 @@
 #ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
 #  define AW_CPU_SPI_INTRINSICS_ONLY 1
 #  include "aw_cpu_spi.h"
+#  include "aw_cpu_mpu_profile.h"
 #  if defined(CONFIG_STM32H7_SPI_DMA) || defined(CONFIG_DEBUG_SPI_INFO) || defined(CONFIG_SPI_DELAY_CONTROL) || defined(CONFIG_SPI_BITORDER) || defined(CONFIG_SPI_TRIGGER) || defined(CONFIG_PM)
 #    error "AW CPU fixed polling SPI profile excludes DMA, debug, delay/bitorder/trigger and PM extensions"
 #  endif
@@ -284,7 +285,7 @@ struct stm32_spidev_s
 
 /* Helpers */
 
-#ifndef CONFIG_ARM_TRUSTRAM_AW_CPU
+#if !defined(CONFIG_ARM_TRUSTRAM_AW_CPU) || defined(AW_CPU_DEVICE_WINDOWS)
 static inline uint32_t spi_getreg(struct stm32_spidev_s *priv,
                                   uint32_t offset);
 static inline void spi_putreg(struct stm32_spidev_s *priv,
@@ -804,11 +805,30 @@ static uint32_t spi_aw_bus(struct stm32_spidev_s *priv)
 #endif
   return 0; /* The typed entry rejects unknown device identities. */
 }
-# define AW_SPI_STATUS(p) aw_cpu_spi_status(spi_aw_bus(p))
-# define AW_SPI_READ8(p) aw_cpu_spi_read8(spi_aw_bus(p))
-# define AW_SPI_READ16(p) aw_cpu_spi_read16(spi_aw_bus(p))
-# define AW_SPI_WRITE8(p,v) aw_cpu_spi_write8(spi_aw_bus(p),(v))
-# define AW_SPI_WRITE16(p,v) aw_cpu_spi_write16(spi_aw_bus(p),(v))
+# ifdef AW_CPU_DEVICE_WINDOWS
+/* SPI1/2/3/5 registers are fixed-MPU device windows, AP3 in every phase
+ * (aw_cpu_mpu_profile.h). This driver accesses them directly; the compiler
+ * lowers each access to an unprivileged T-access. Only SPI6, outside the
+ * windows, keeps the typed polling service and its CLAIM ownership.
+ */
+#  define SPI_AW_TYPED(p) ((p)->spibase == STM32_SPI6_BASE)
+#  define SPI_AW_DIRECT(x) (x)
+#  define SPI_AW_DIRECT_VALUE(x) (x)
+# else
+#  define SPI_AW_TYPED(p) 1
+#  define SPI_AW_DIRECT(x) ((void)0)
+#  define SPI_AW_DIRECT_VALUE(x) 0u
+# endif
+# define AW_SPI_STATUS(p) (SPI_AW_TYPED(p) ? aw_cpu_spi_status(spi_aw_bus(p)) : \
+    SPI_AW_DIRECT_VALUE(spi_getreg((p),STM32_SPI_SR_OFFSET)))
+# define AW_SPI_READ8(p) (SPI_AW_TYPED(p) ? aw_cpu_spi_read8(spi_aw_bus(p)) : \
+    SPI_AW_DIRECT_VALUE(spi_getreg8((p),STM32_SPI_RXDR_OFFSET)))
+# define AW_SPI_READ16(p) (SPI_AW_TYPED(p) ? aw_cpu_spi_read16(spi_aw_bus(p)) : \
+    SPI_AW_DIRECT_VALUE(spi_getreg16((p),STM32_SPI_RXDR_OFFSET)))
+# define AW_SPI_WRITE8(p,v) do { if (SPI_AW_TYPED(p)) aw_cpu_spi_write8(spi_aw_bus(p),(v)); \
+    else SPI_AW_DIRECT(spi_putreg8((p),STM32_SPI_TXDR_OFFSET,(v))); } while (0)
+# define AW_SPI_WRITE16(p,v) do { if (SPI_AW_TYPED(p)) aw_cpu_spi_write16(spi_aw_bus(p),(v)); \
+    else SPI_AW_DIRECT(spi_putreg16((p),STM32_SPI_TXDR_OFFSET,(v))); } while (0)
 #else
 # define AW_SPI_STATUS(p) spi_getreg((p),STM32_SPI_SR_OFFSET)
 # define AW_SPI_READ8(p) spi_getreg8((p),STM32_SPI_RXDR_OFFSET)
@@ -817,7 +837,7 @@ static uint32_t spi_aw_bus(struct stm32_spidev_s *priv)
 # define AW_SPI_WRITE16(p,v) spi_putreg16((p),STM32_SPI_TXDR_OFFSET,(v))
 #endif
 
-#ifndef CONFIG_ARM_TRUSTRAM_AW_CPU
+#if !defined(CONFIG_ARM_TRUSTRAM_AW_CPU) || defined(AW_CPU_DEVICE_WINDOWS)
 /****************************************************************************
  * Name: spi_getreg8
  *
@@ -954,10 +974,23 @@ static void spi_modifyreg(struct stm32_spidev_s *priv, uint32_t offset,
 {
   /* Only 32-bit registers */
 
+#ifdef AW_CPU_DEVICE_WINDOWS
+  /* Only the bus owner (its PX4 work queue or the SPI_LOCK holder) touches
+   * these registers and no SPI interrupt handler is attached, so a plain
+   * read-modify-write suffices.  modifyreg32()'s critical section would cost
+   * two protected mask gates for every register update.
+   */
+
+  uint32_t regval = spi_getreg(priv, offset);
+  regval &= ~clrbits;
+  regval |= setbits;
+  spi_putreg(priv, offset, regval);
+#else
   modifyreg32(priv->spibase + offset, clrbits, setbits);
+#endif
 }
 
-#endif /* !CONFIG_ARM_TRUSTRAM_AW_CPU */
+#endif /* !CONFIG_ARM_TRUSTRAM_AW_CPU || AW_CPU_DEVICE_WINDOWS */
 
 /****************************************************************************
  * Name: spi_readword
@@ -1475,13 +1508,13 @@ static int spi_lock(struct spi_dev_s *dev, bool lock)
     {
       ret = nxsem_wait_uninterruptible(&priv->exclsem);
 #ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
-      if (ret == OK) aw_cpu_spi_claim(spi_aw_bus(priv));
+      if (ret == OK && SPI_AW_TYPED(priv)) aw_cpu_spi_claim(spi_aw_bus(priv));
 #endif
     }
   else
     {
 #ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
-      aw_cpu_spi_release(spi_aw_bus(priv));
+      if (SPI_AW_TYPED(priv)) aw_cpu_spi_release(spi_aw_bus(priv));
 #endif
       ret = nxsem_post(&priv->exclsem);
     }
@@ -1502,7 +1535,9 @@ static inline int spi_enable(struct stm32_spidev_s *priv, bool state)
       /* Enable SPI */
 
 #ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
-      aw_cpu_spi_enable(spi_aw_bus(priv), 1u);
+      if (SPI_AW_TYPED(priv)) aw_cpu_spi_enable(spi_aw_bus(priv), 1u);
+      else SPI_AW_DIRECT(spi_modifyreg(priv, STM32_SPI_CR1_OFFSET, 0,
+                                       SPI_CR1_SPE));
 #else
       spi_modifyreg(priv, STM32_SPI_CR1_OFFSET, 0, SPI_CR1_SPE);
 #endif
@@ -1512,7 +1547,9 @@ static inline int spi_enable(struct stm32_spidev_s *priv, bool state)
       /* Disable SPI */
 
 #ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
-      aw_cpu_spi_enable(spi_aw_bus(priv), 0u);
+      if (SPI_AW_TYPED(priv)) aw_cpu_spi_enable(spi_aw_bus(priv), 0u);
+      else SPI_AW_DIRECT(spi_modifyreg(priv, STM32_SPI_CR1_OFFSET,
+                                       SPI_CR1_SPE, 0));
 #else
       spi_modifyreg(priv, STM32_SPI_CR1_OFFSET, SPI_CR1_SPE, 0);
 #endif
@@ -1615,7 +1652,10 @@ static uint32_t spi_setfrequency(struct spi_dev_s *dev,
 
       spi_enable(priv, false);
 #ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
-      aw_cpu_spi_divider(spi_aw_bus(priv), setbits >> SPI_CFG1_MBR_SHIFT);
+      if (SPI_AW_TYPED(priv))
+        aw_cpu_spi_divider(spi_aw_bus(priv), setbits >> SPI_CFG1_MBR_SHIFT);
+      else SPI_AW_DIRECT(spi_modifyreg(priv, STM32_SPI_CFG1_OFFSET,
+                                       SPI_CFG1_MBR_MASK, setbits));
 #else
       spi_modifyreg(priv, STM32_SPI_CFG1_OFFSET, SPI_CFG1_MBR_MASK, setbits);
 #endif
@@ -1742,8 +1782,13 @@ static void spi_setmode(struct spi_dev_s *dev, enum spi_mode_e mode)
       /* Change SPI mode */
 
 #ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
-      (void)clrbits; (void)setbits;
-      aw_cpu_spi_mode(spi_aw_bus(priv), (uint32_t)mode);
+      if (SPI_AW_TYPED(priv))
+        {
+          (void)clrbits; (void)setbits;
+          aw_cpu_spi_mode(spi_aw_bus(priv), (uint32_t)mode);
+        }
+      else SPI_AW_DIRECT(spi_modifyreg(priv, STM32_SPI_CFG2_OFFSET,
+                                       clrbits, setbits));
 #else
       spi_modifyreg(priv, STM32_SPI_CFG2_OFFSET, clrbits, setbits);
 #endif
@@ -1757,7 +1802,8 @@ static void spi_setmode(struct spi_dev_s *dev, enum spi_mode_e mode)
           /* Flush SPI read FIFO */
 
 #ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
-          aw_cpu_spi_flush(spi_aw_bus(priv));
+          if (SPI_AW_TYPED(priv)) aw_cpu_spi_flush(spi_aw_bus(priv));
+          else SPI_AW_DIRECT((void)spi_getreg(priv, STM32_SPI_RXDR_OFFSET));
 #else
           spi_getreg(priv, STM32_SPI_RXDR_OFFSET);
 #endif
@@ -1814,8 +1860,13 @@ static void spi_setbits(struct spi_dev_s *dev, int nbits)
 
       spi_enable(priv, false);
 #ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
-      (void)clrbits; (void)setbits;
-      aw_cpu_spi_bits(spi_aw_bus(priv), (uint32_t)nbits);
+      if (SPI_AW_TYPED(priv))
+        {
+          (void)clrbits; (void)setbits;
+          aw_cpu_spi_bits(spi_aw_bus(priv), (uint32_t)nbits);
+        }
+      else SPI_AW_DIRECT(spi_modifyreg(priv, STM32_SPI_CFG1_OFFSET,
+                                       clrbits, setbits));
 #else
       spi_modifyreg(priv, STM32_SPI_CFG1_OFFSET, clrbits, setbits);
 #endif
@@ -1923,7 +1974,9 @@ static uint32_t spi_send(struct spi_dev_s *dev, uint32_t wd)
   /* Clear suspend flag */
 
 #ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
-  aw_cpu_spi_clear_suspend(spi_aw_bus(priv));
+  if (SPI_AW_TYPED(priv)) aw_cpu_spi_clear_suspend(spi_aw_bus(priv));
+  else SPI_AW_DIRECT(spi_modifyreg(priv, STM32_SPI_IFCR_OFFSET, 0,
+                                   SPI_IFCR_SUSPC));
 #else
   spi_modifyreg(priv, STM32_SPI_IFCR_OFFSET, 0, SPI_IFCR_SUSPC);
 #endif
@@ -1933,7 +1986,9 @@ static uint32_t spi_send(struct spi_dev_s *dev, uint32_t wd)
   if (priv->config != SIMPLEX_RX)
     {
 #ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
-      aw_cpu_spi_start(spi_aw_bus(priv));
+      if (SPI_AW_TYPED(priv)) aw_cpu_spi_start(spi_aw_bus(priv));
+      else SPI_AW_DIRECT(spi_modifyreg(priv, STM32_SPI_CR1_OFFSET, 0,
+                                       SPI_CR1_CSTART));
 #else
       spi_modifyreg(priv, STM32_SPI_CR1_OFFSET, 0, SPI_CR1_CSTART);
 #endif
@@ -1964,7 +2019,9 @@ static uint32_t spi_send(struct spi_dev_s *dev, uint32_t wd)
   /* Suspend */
 
 #ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
-  aw_cpu_spi_suspend(spi_aw_bus(priv));
+  if (SPI_AW_TYPED(priv)) aw_cpu_spi_suspend(spi_aw_bus(priv));
+  else SPI_AW_DIRECT(spi_modifyreg(priv, STM32_SPI_CR1_OFFSET, 0,
+                                   SPI_CR1_CSUSP));
 #else
   spi_modifyreg(priv, STM32_SPI_CR1_OFFSET, 0, SPI_CR1_CSUSP);
 #endif
@@ -2027,7 +2084,9 @@ static void spi_exchange_nodma(struct spi_dev_s *dev,
   /* Disable the DMA Requests */
 
 #ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
-  aw_cpu_spi_no_dma(spi_aw_bus(priv));
+  if (SPI_AW_TYPED(priv)) aw_cpu_spi_no_dma(spi_aw_bus(priv));
+  else SPI_AW_DIRECT(spi_modifyreg(priv, STM32_SPI_CFG1_OFFSET,
+                                   SPI_CFG1_RXDMAEN | SPI_CFG1_TXDMAEN, 0));
 #else
   spi_modifyreg(priv, STM32_SPI_CFG1_OFFSET, SPI_CFG1_RXDMAEN |
                                              SPI_CFG1_TXDMAEN, 0);
@@ -2549,7 +2608,7 @@ static int spi_pm_prepare(struct pm_callback_s *cb, int domain,
 
 static void spi_bus_initialize(struct stm32_spidev_s *priv)
 {
-#ifndef CONFIG_ARM_TRUSTRAM_AW_CPU
+#if !defined(CONFIG_ARM_TRUSTRAM_AW_CPU) || defined(AW_CPU_DEVICE_WINDOWS)
   uint32_t setbits = 0;
   uint32_t clrbits = 0;
 #endif
@@ -2558,8 +2617,16 @@ static void spi_bus_initialize(struct stm32_spidev_s *priv)
 #endif
 
 #ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
-  aw_cpu_spi_init(spi_aw_bus(priv));
-#else
+  if (SPI_AW_TYPED(priv))
+    {
+      aw_cpu_spi_init(spi_aw_bus(priv));
+    }
+#endif
+#if defined(AW_CPU_DEVICE_WINDOWS)
+  else
+#endif
+#if !defined(CONFIG_ARM_TRUSTRAM_AW_CPU) || defined(AW_CPU_DEVICE_WINDOWS)
+    {
   /* Configure CR1, CFG1 and CFG2. Default configuration:
    *   Mode 0:                        CFG2.CPHA=0 and CFG2.CPOL=0
    *   Master:                        CFG2.MSTR=1
@@ -2607,7 +2674,7 @@ static void spi_bus_initialize(struct stm32_spidev_s *priv)
     }
 
   spi_modifyreg(priv, STM32_SPI_CFG2_OFFSET, clrbits, setbits);
-
+    }
 #endif
 
   priv->frequency = 0;
@@ -2622,6 +2689,11 @@ static void spi_bus_initialize(struct stm32_spidev_s *priv)
 
 #ifndef CONFIG_ARM_TRUSTRAM_AW_CPU
   spi_putreg(priv, STM32_SPI_CRCPOLY_OFFSET, 7);
+#else
+  if (!SPI_AW_TYPED(priv))
+    {
+      SPI_AW_DIRECT(spi_putreg(priv, STM32_SPI_CRCPOLY_OFFSET, 7));
+    }
 #endif
 
   /* Initialize the SPI semaphore that enforces mutually exclusive access. */
@@ -2690,7 +2762,7 @@ static void spi_bus_initialize(struct stm32_spidev_s *priv)
 
   spi_enable(priv, true);
 #ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
-  aw_cpu_spi_finish_init(spi_aw_bus(priv));
+  if (SPI_AW_TYPED(priv)) aw_cpu_spi_finish_init(spi_aw_bus(priv));
 #endif
 
 #ifdef CONFIG_PM
