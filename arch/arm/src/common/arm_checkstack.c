@@ -36,11 +36,30 @@
 #include "sched/sched.h"
 #include "arm_internal.h"
 
+#if defined(CONFIG_ARM_TRUSTRAM_AW_CPU) && defined(AW_CPU_SHADOW_FIRMWARE_EXPERIMENT)
+#  include "aw_cpu_shadow_firmware.h"
+#  define ARM_STACK_ACTIVE_GUARD 1
+#endif
+
 #ifdef CONFIG_STACK_COLORATION
 
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
+
+#ifdef ARM_STACK_ACTIVE_GUARD
+/* The running activation's stack bottom holds the active MPU stack guard
+ * (region 11, no access). It is never thread stack, so coloration and the
+ * high-water scan step over it. The descriptor is privileged read-only.
+ */
+
+static bool arm_stack_guarded(const uint32_t *ptr)
+{
+  return g_aw_cpu_active_guard.rasr != 0 &&
+         (uintptr_t)ptr - g_aw_cpu_active_guard.base <
+         AW_CPU_ACTIVE_GUARD_BYTES;
+}
+#endif
 
 /****************************************************************************
  * Public Functions
@@ -90,9 +109,15 @@ size_t arm_stack_check(void *stackbase, size_t nbytes)
    * that does not have the magic value is the high water mark.
    */
 
+#ifdef ARM_STACK_ACTIVE_GUARD
+  for (ptr = (uint32_t *)start, mark = (nbytes >> 2);
+       mark > 0 && (arm_stack_guarded(ptr) || *ptr == STACK_COLOR);
+       ptr++, mark--);
+#else
   for (ptr = (uint32_t *)start, mark = (nbytes >> 2);
        *ptr == STACK_COLOR && mark > 0;
        ptr++, mark--);
+#endif
 
   /* If the stack is completely used, then this might mean that the stack
    * overflowed from above (meaning that the stack is too small), or may
@@ -184,7 +209,16 @@ void arm_stack_color(void *stackbase, size_t nbytes)
 
   while (nwords-- > 0)
     {
+#ifdef ARM_STACK_ACTIVE_GUARD
+      if (!arm_stack_guarded(stkptr))
+        {
+          *stkptr = STACK_COLOR;
+        }
+
+      stkptr++;
+#else
       *stkptr++ = STACK_COLOR;
+#endif
     }
 }
 
