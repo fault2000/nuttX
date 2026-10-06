@@ -451,7 +451,10 @@ void arm_addregion(void)
     }
 #endif
 
-#if defined(HAVE_DTCM) && !defined(AW_CPU_INLINE_FIRMWARE_EXPERIMENT)
+/* The physical experiments place protected SERVICE/shadow state in DTCM. */
+
+#if defined(HAVE_DTCM) && !defined(AW_CPU_INLINE_FIRMWARE_EXPERIMENT) && \
+    !defined(AW_CPU_SHADOW_FIRMWARE_EXPERIMENT)
   if (mm_regions < CONFIG_MM_REGIONS)
     {
 #if BOARD_DTCM_RSVD_TAIL_SIZE > 0
