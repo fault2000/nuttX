@@ -37,6 +37,10 @@
 #ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
 # define AW_CPU_CHIP_INTRINSICS_ONLY 1
 # include "aw_cpu_chip.h"
+
+/* The CPU-profile dispatcher calls this exact registered target directly. */
+
+int stm32_timerisr(int irq, void *context, void *arg);
 #endif
 
 /****************************************************************************
@@ -114,7 +118,10 @@
  *
  ****************************************************************************/
 
-static int stm32_timerisr(int irq, uint32_t *regs, void *arg)
+#ifndef CONFIG_ARM_TRUSTRAM_AW_CPU
+static
+#endif
+int stm32_timerisr(int irq, void *context, void *arg)
 {
   /* Process timer interrupt */
 

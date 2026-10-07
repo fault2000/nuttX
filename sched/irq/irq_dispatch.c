@@ -108,6 +108,17 @@
      vector(irq, context, arg)
 #endif /* CONFIG_SCHED_IRQMONITOR */
 
+#if defined(CONFIG_ARM_TRUSTRAM_AW_CPU) && defined(CONFIG_ARCH_CHIP_STM32H7)
+/* These two handlers are exported by the STM32H7/PX4 CPU profile.  Keep the
+ * registered vector as the selector so detach, rebind and IRQ chains still
+ * take the existing indirect path.  SVC uses the protected checkpoint path
+ * in this profile; arm_svcall is not registered or linked.
+ */
+
+int stm32_timerisr(int irq, FAR void *context, FAR void *arg);
+int hrt_tim_isr(int irq, FAR void *context, FAR void *arg);
+#endif
+
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
@@ -165,7 +176,20 @@ void irq_dispatch(int irq, FAR void *context)
 
   /* Then dispatch to the interrupt handler */
 
-  CALL_VECTOR(ndx, vector, irq, context, arg);
+#if defined(CONFIG_ARM_TRUSTRAM_AW_CPU) && defined(CONFIG_ARCH_CHIP_STM32H7)
+  if (irq == STM32_IRQ_SYSTICK && vector == stm32_timerisr && arg == NULL)
+    {
+      CALL_VECTOR(ndx, stm32_timerisr, irq, context, arg);
+    }
+  else if (irq == STM32_IRQ_TIM8CC && vector == hrt_tim_isr && arg == NULL)
+    {
+      CALL_VECTOR(ndx, hrt_tim_isr, irq, context, arg);
+    }
+  else
+#endif
+    {
+      CALL_VECTOR(ndx, vector, irq, context, arg);
+    }
   UNUSED(ndx);
 
 #ifdef CONFIG_SCHED_INSTRUMENTATION_IRQHANDLER
