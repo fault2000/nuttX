@@ -65,6 +65,28 @@ struct spi_dev_s; /* Forward reference */
 
 struct spi_dev_s *stm32_spibus_initialize(int bus);
 
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+/****************************************************************************
+ * Name: stm32_spi_transfer
+ *
+ * Description:
+ *   One complete transfer on a device of this driver: the operations of
+ *   SPI_SETFREQUENCY, SPI_SETMODE, SPI_SETBITS, SPI_SELECT(true),
+ *   SPI_EXCHANGE and SPI_SELECT(false), in that order, as direct calls.  In
+ *   the TRUST-RAM CPU profile every call through struct spi_ops_s crosses an
+ *   indirect-call gate.  mode is an enum spi_mode_e value.
+ *
+ * Returned Value:
+ *   OK, or -ENODEV without any operation if dev is not one of this driver's
+ *   devices.
+ *
+ ****************************************************************************/
+
+int stm32_spi_transfer(struct spi_dev_s *dev, uint32_t devid,
+                       uint32_t frequency, int mode, int nbits,
+                       const void *txbuffer, void *rxbuffer, size_t nwords);
+#endif
+
 /****************************************************************************
  * Name: stm32_spi_slave_initialize
  *

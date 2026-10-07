@@ -2961,6 +2961,130 @@ struct spi_dev_s *stm32_spibus_initialize(int bus)
   return (struct spi_dev_s *)priv;
 }
 
+#ifdef CONFIG_ARM_TRUSTRAM_AW_CPU
+/****************************************************************************
+ * Name: spi_direct_bus / spi_direct_select
+ *
+ * Description:
+ *   Device identity of stm32_spi_transfer() (one of this driver's devices,
+ *   by address) and a direct call of the select function that the bus's ops
+ *   table names.
+ *
+ ****************************************************************************/
+
+static int spi_direct_bus(struct spi_dev_s *dev)
+{
+#ifdef CONFIG_STM32H7_SPI1
+  if (dev == &g_spi1dev.spidev)
+    {
+      return 1;
+    }
+#endif
+#ifdef CONFIG_STM32H7_SPI2
+  if (dev == &g_spi2dev.spidev)
+    {
+      return 2;
+    }
+#endif
+#ifdef CONFIG_STM32H7_SPI3
+  if (dev == &g_spi3dev.spidev)
+    {
+      return 3;
+    }
+#endif
+#ifdef CONFIG_STM32H7_SPI4
+  if (dev == &g_spi4dev.spidev)
+    {
+      return 4;
+    }
+#endif
+#ifdef CONFIG_STM32H7_SPI5
+  if (dev == &g_spi5dev.spidev)
+    {
+      return 5;
+    }
+#endif
+#ifdef CONFIG_STM32H7_SPI6
+  if (dev == &g_spi6dev.spidev)
+    {
+      return 6;
+    }
+#endif
+  return 0;
+}
+
+static void spi_direct_select(int bus, struct spi_dev_s *dev,
+                              uint32_t devid, bool selected)
+{
+#ifdef CONFIG_STM32H7_SPI1
+  if (bus == 1)
+    {
+      stm32_spi1select(dev, devid, selected);
+    }
+#endif
+#ifdef CONFIG_STM32H7_SPI2
+  if (bus == 2)
+    {
+      stm32_spi2select(dev, devid, selected);
+    }
+#endif
+#ifdef CONFIG_STM32H7_SPI3
+  if (bus == 3)
+    {
+      stm32_spi3select(dev, devid, selected);
+    }
+#endif
+#ifdef CONFIG_STM32H7_SPI4
+  if (bus == 4)
+    {
+      stm32_spi4select(dev, devid, selected);
+    }
+#endif
+#ifdef CONFIG_STM32H7_SPI5
+  if (bus == 5)
+    {
+      stm32_spi5select(dev, devid, selected);
+    }
+#endif
+#ifdef CONFIG_STM32H7_SPI6
+  if (bus == 6)
+    {
+      stm32_spi6select(dev, devid, selected);
+    }
+#endif
+}
+
+/****************************************************************************
+ * Name: stm32_spi_transfer
+ *
+ * Description:
+ *   See stm32_spi.h: SPI_SETFREQUENCY, SPI_SETMODE, SPI_SETBITS,
+ *   SPI_SELECT(true), SPI_EXCHANGE and SPI_SELECT(false) of this driver's
+ *   ops table, in that order, as direct calls.
+ *
+ ****************************************************************************/
+
+int stm32_spi_transfer(struct spi_dev_s *dev, uint32_t devid,
+                       uint32_t frequency, int mode, int nbits,
+                       const void *txbuffer, void *rxbuffer, size_t nwords)
+{
+  int bus = spi_direct_bus(dev);
+
+  if (bus == 0)
+    {
+      return -ENODEV;
+    }
+
+  spi_setfrequency(dev, frequency);
+  spi_setmode(dev, (enum spi_mode_e)mode);
+  spi_setbits(dev, nbits);
+  spi_direct_select(bus, dev, devid, true);
+  spi_exchange(dev, txbuffer, rxbuffer, nwords);
+  spi_direct_select(bus, dev, devid, false);
+  return OK;
+}
+#endif /* CONFIG_ARM_TRUSTRAM_AW_CPU */
+
 #endif /* CONFIG_STM32H7_SPI1 || CONFIG_STM32H7_SPI2 || CONFIG_STM32H7_SPI3 ||
         * CONFIG_STM32H7_SPI4 || CONFIG_STM32H7_SPI5 || CONFIG_STM32H7_SPI6
         */
