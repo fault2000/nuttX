@@ -30,6 +30,7 @@
 #include <nuttx/wdog.h>
 
 #include <nuttx/irq.h>
+#include <nuttx/i2c/i2c_order_trace.h>
 
 #include "semaphore/semaphore.h"
 
@@ -76,9 +77,16 @@ void nxsem_timeout(wdparm_t pid)
 
   if (wtcb && wtcb->task_state == TSTATE_WAIT_SEM)
     {
+#ifdef AW_I2C_ORDER_ENABLED
+      FAR sem_t *sem = wtcb->waitsem;
+#endif
+
       /* Cancel the semaphore wait */
 
+      AW_I2C_ORDER(sem, AW_I2C_TIMEOUT_BEFORE, wtcb->pid,
+                   wtcb->task_state);
       nxsem_wait_irq(wtcb, ETIMEDOUT);
+      AW_I2C_ORDER(sem, AW_I2C_TIMEOUT_AFTER, pid, wtcb->task_state);
     }
 
   /* Interrupts may now be enabled. */

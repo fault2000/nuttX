@@ -30,6 +30,7 @@
 
 #include <nuttx/irq.h>
 #include <nuttx/arch.h>
+#include <nuttx/i2c/i2c_order_trace.h>
 
 #include "sched/sched.h"
 #include "semaphore/semaphore.h"
@@ -83,11 +84,14 @@ int nxsem_post(FAR sem_t *sem)
        */
 
       flags = enter_critical_section();
+      AW_I2C_ORDER(sem, AW_I2C_POST_ENTER, sem->semcount, 0);
 
       /* Check the maximum allowable value */
 
       if (sem->semcount >= SEM_VALUE_MAX)
         {
+          AW_I2C_ORDER(sem, AW_I2C_POST_RETURN, -EOVERFLOW,
+                       sem->semcount);
           leave_critical_section(flags);
           return -EOVERFLOW;
         }
@@ -154,6 +158,9 @@ int nxsem_post(FAR sem_t *sem)
               /* It is, let the task take the semaphore */
 
               stcb->waitsem = NULL;
+              AW_I2C_ORDER(sem, AW_I2C_POST_WAKE, stcb->pid,
+                           ((uint32_t)stcb->task_state << 16) |
+                           ((uint32_t)stcb->errcode & 0xffffu));
 
               /* Restart the waiting task. */
 
@@ -179,6 +186,7 @@ int nxsem_post(FAR sem_t *sem)
       sched_unlock();
 #endif
       ret = OK;
+      AW_I2C_ORDER(sem, AW_I2C_POST_RETURN, ret, sem->semcount);
 
       /* Interrupts may now be enabled. */
 

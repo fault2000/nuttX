@@ -34,6 +34,7 @@
 #include <nuttx/irq.h>
 #include <nuttx/arch.h>
 #include <nuttx/clock.h>
+#include <nuttx/i2c/i2c_order_trace.h>
 #include <nuttx/wdog.h>
 
 #include "sched/sched.h"
@@ -85,6 +86,7 @@ int nxsem_tickwait(FAR sem_t *sem, uint32_t delay)
   /* Try to take the semaphore without waiting. */
 
   ret = nxsem_trywait(sem);
+  AW_I2C_ORDER(sem, AW_I2C_TRY_RETURN, ret, sem->semcount);
   if (ret == OK)
     {
       /* We got it! */
@@ -105,11 +107,14 @@ int nxsem_tickwait(FAR sem_t *sem, uint32_t delay)
 
   /* Start the watchdog with interrupts still disabled */
 
+  AW_I2C_ORDER(sem, AW_I2C_ARM_BEFORE, delay, rtcb->pid);
   wd_start(&rtcb->waitdog, delay, nxsem_timeout, getpid());
+  AW_I2C_ORDER(sem, AW_I2C_ARM_AFTER, delay, rtcb->pid);
 
   /* Now perform the blocking wait */
 
   ret = nxsem_wait(sem);
+  AW_I2C_ORDER(sem, AW_I2C_SEM_WAIT_RETURN, ret, sem->semcount);
 
   /* Stop the watchdog timer */
 

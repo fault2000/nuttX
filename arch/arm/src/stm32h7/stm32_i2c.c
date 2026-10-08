@@ -229,6 +229,7 @@
 #include <nuttx/clock.h>
 #include <nuttx/power/pm.h>
 #include <nuttx/i2c/i2c_master.h>
+#include <nuttx/i2c/i2c_order_trace.h>
 
 #include <arch/board/board.h>
 
@@ -816,6 +817,8 @@ static inline int stm32_i2c_sem_waitdone(struct stm32_i2c_priv_s *priv)
   /* Signal the interrupt handler that we are waiting */
 
   priv->intstate = INTSTATE_WAITING;
+  AW_I2C_ORDER(&priv->sem_isr, AW_I2C_DRIVER_WAITING,
+               priv->intstate, priv->sem_isr.semcount);
   do
     {
       /* Wait until either the transfer is complete or the timeout expires */
@@ -844,7 +847,11 @@ static inline int stm32_i2c_sem_waitdone(struct stm32_i2c_priv_s *priv)
 
   /* Set the interrupt state back to IDLE */
 
+  AW_I2C_ORDER(&priv->sem_isr, AW_I2C_DRIVER_WAIT_RETURN,
+               ret, priv->intstate);
   priv->intstate = INTSTATE_IDLE;
+  AW_I2C_ORDER(&priv->sem_isr, AW_I2C_DRIVER_IDLE,
+               priv->intstate, priv->sem_isr.semcount);
 
   /* Disable I2C interrupts */
 
@@ -854,6 +861,13 @@ static inline int stm32_i2c_sem_waitdone(struct stm32_i2c_priv_s *priv)
   stm32_i2c_modifyreg32(priv, STM32_I2C_CR1_OFFSET, I2C_CR1_ALLINTS, 0);
 #endif
 
+#ifdef AW_I2C_ORDER_ENABLED
+  if (g_aw_i2c_order.active_sem == (uintptr_t)&priv->sem_isr)
+    {
+      g_aw_i2c_order.end_tick = clock_systime_ticks();
+      g_aw_i2c_order.active_sem = 0;
+    }
+#endif
   leave_critical_section(flags);
   return ret;
 }
@@ -1628,6 +1642,30 @@ status = aw_cpu_i2c_status(stm32_i2c_aw_bus(priv));
 status = stm32_i2c_getreg32(priv, STM32_I2C_ISR_OFFSET);
 #endif
 
+#ifdef AW_I2C_ORDER_ENABLED
+  /* EV/ER for this bus use the same NVIC preemption priority. Only this
+   * ISR writes this lane; SysTick/thread decision records use another lane.
+   * Reuse the status already read by the driver, without an extra MMIO read.
+   */
+  if (g_aw_i2c_order.active_sem == (uintptr_t)&priv->sem_isr)
+    {
+      uint32_t i = g_aw_i2c_order.isr_used;
+      if (i < AW_I2C_ORDER_ISR_MAX)
+        {
+          g_aw_i2c_order.isr[i].tick = clock_systime_ticks();
+          g_aw_i2c_order.isr[i].a = status;
+          g_aw_i2c_order.isr[i].b =
+            ((uint32_t)priv->intstate << 24) |
+            ((uint32_t)(uint8_t)priv->msgc << 16) |
+            (uint16_t)priv->dcnt;
+          g_aw_i2c_order.isr_used = i + 1;
+        }
+      else
+        {
+          g_aw_i2c_order.isr_overflow = 1;
+        }
+    }
+#endif
   i2cinfo("ENTER: status = 0x%08" PRIx32 "\n", status);
 
   /* Update private version of the state assuming a good state */
@@ -2427,6 +2465,54 @@ static int stm32_i2c_deinit(struct stm32_i2c_priv_s *priv)
  *
  ****************************************************************************/
 
+#ifdef AW_I2C_ORDER_ENABLED
+/* Ordinary diagnostic RAM; it grants no device or patch authority. Every
+ * write still passes through the ordinary-code store transformation.
+ */
+volatile struct aw_i2c_order_trace g_aw_i2c_order;
+static volatile uint32_t g_aw_i2c_order_sink;
+
+/* The user-run GDB script stops at this function's entry AFTER the transfer.
+ * r0-r3 carry actual CPU loads of the journal, including dirty cache values.
+ * A real observable C side effect prevents the compiler removing these calls.
+ */
+__attribute__((noinline))
+void stm32_i2c_order_emit(uint32_t tag, uint32_t a, uint32_t b, uint32_t c)
+{
+  g_aw_i2c_order_sink = tag ^ a ^ b ^ c;
+}
+
+static void stm32_i2c_order_report(int waitrc, int result,
+                                  uint32_t status, uint32_t frequency)
+{
+  uint32_t used = g_aw_i2c_order.used;
+  uint32_t isr_used = g_aw_i2c_order.isr_used;
+  uint32_t overflow = g_aw_i2c_order.overflow |
+                      (g_aw_i2c_order.isr_overflow << 1);
+  stm32_i2c_order_emit(0x10000000, 1, used, overflow);
+  stm32_i2c_order_emit(0x10000001, 4, 0x7702, frequency);
+  stm32_i2c_order_emit(0x10000002, waitrc, result, status);
+  stm32_i2c_order_emit(0x10000003, g_aw_i2c_order.start_tick,
+                        g_aw_i2c_order.end_tick, isr_used);
+  for (uint32_t i = 0; i < used && i < AW_I2C_ORDER_MAX; i++)
+    {
+      stm32_i2c_order_emit(0x20000000 | (i << 8) |
+                            g_aw_i2c_order.rows[i].event,
+                          g_aw_i2c_order.rows[i].tick,
+                          g_aw_i2c_order.rows[i].a,
+                          g_aw_i2c_order.rows[i].b);
+    }
+  for (uint32_t i = 0; i < isr_used && i < AW_I2C_ORDER_ISR_MAX; i++)
+    {
+      stm32_i2c_order_emit(0x30000000 | i,
+                          g_aw_i2c_order.isr[i].tick,
+                          g_aw_i2c_order.isr[i].a,
+                          g_aw_i2c_order.isr[i].b);
+    }
+  stm32_i2c_order_emit(0xffffffff, used, overflow, result);
+}
+#endif
+
 static int stm32_i2c_process(struct i2c_master_s *dev,
                              struct i2c_msg_s *msgs, int count)
 {
@@ -2437,6 +2523,9 @@ static int stm32_i2c_process(struct i2c_master_s *dev,
   uint32_t    cr2;
   int         errval = 0;
   int         waitrc = 0;
+#ifdef AW_I2C_ORDER_ENABLED
+  bool        order_selected = false;
+#endif
 
   DEBUGASSERT(count > 0);
 
@@ -2466,6 +2555,24 @@ static int stm32_i2c_process(struct i2c_master_s *dev,
    */
 
   priv->status = 0;
+
+#ifdef AW_I2C_ORDER_ENABLED
+  /* Capture only the first BMP388 post-reset error-register read, after
+   * prior traffic has been cleared and before this transfer is started.
+   * The existing bus mutex serializes the owner. Never reset a live journal.
+   */
+  if (!g_aw_i2c_order.taken && priv == &stm32_i2c4_priv && count == 2 &&
+      msgs[0].addr == 0x77 && msgs[1].addr == 0x77 &&
+      msgs[0].flags == 0 && msgs[1].flags == I2C_M_READ &&
+      msgs[0].length == 1 && msgs[1].length == 1 &&
+      msgs[0].buffer != NULL && msgs[0].buffer[0] == 0x02)
+    {
+      g_aw_i2c_order.taken = 1;
+      g_aw_i2c_order.start_tick = clock_systime_ticks();
+      g_aw_i2c_order.active_sem = (uintptr_t)&priv->sem_isr;
+      order_selected = true;
+    }
+#endif
 
 #ifndef CONFIG_I2C_POLLED
   /* Enable transmit and receive interrupts here so when we send the start
@@ -2659,6 +2766,12 @@ static int stm32_i2c_process(struct i2c_master_s *dev,
 #endif
   stm32_i2c_sem_post(dev);
 
+#ifdef AW_I2C_ORDER_ENABLED
+  if (order_selected)
+    {
+      stm32_i2c_order_report(waitrc, -errval, status, msgs[0].frequency);
+    }
+#endif
   return -errval;
 }
 
