@@ -2067,6 +2067,114 @@ static uint32_t spi_send(struct spi_dev_s *dev, uint32_t wd)
 
 #if !defined(CONFIG_STM32H7_SPI_DMA) || defined(CONFIG_STM32H7_DMACAPABLE) || \
      defined(CONFIG_STM32H7_SPI_DMATHRESHOLD)
+#if defined(CONFIG_ARM_TRUSTRAM_AW_CPU) && defined(AW_CPU_DEVICE_WINDOWS)
+/* Keep each bus's MMIO addresses constant in its ordinary polling loop.
+ * The per-bus wrappers prevent merging the loops into a variable-base path.
+ * These accesses retain the compiler's unprivileged load/store conversion.
+ */
+
+static inline __attribute__((always_inline)) void
+spi_exchange_fixed8(uint32_t base, const void *txbuffer, void *rxbuffer,
+                    size_t nwords)
+{
+  const uint8_t *src = (const uint8_t *)txbuffer;
+  uint8_t *dest = (uint8_t *)rxbuffer;
+  uint32_t regval;
+  uint8_t word;
+
+  regval = getreg32(base + STM32_SPI_CFG1_OFFSET);
+  regval &= ~(SPI_CFG1_RXDMAEN | SPI_CFG1_TXDMAEN);
+  putreg32(regval, base + STM32_SPI_CFG1_OFFSET);
+
+  while (nwords-- > 0)
+    {
+      word = src ? *src++ : 0xff;
+
+      regval = getreg32(base + STM32_SPI_IFCR_OFFSET);
+      putreg32(regval | SPI_IFCR_SUSPC, base + STM32_SPI_IFCR_OFFSET);
+
+      regval = getreg32(base + STM32_SPI_CR1_OFFSET);
+      putreg32(regval | SPI_CR1_CSTART, base + STM32_SPI_CR1_OFFSET);
+
+      while ((getreg32(base + STM32_SPI_SR_OFFSET) & SPI_SR_TXP) == 0);
+      putreg8(word, base + STM32_SPI_TXDR_OFFSET);
+      while ((getreg32(base + STM32_SPI_SR_OFFSET) & SPI_SR_RXP) == 0);
+      word = getreg8(base + STM32_SPI_RXDR_OFFSET);
+
+      (void)getreg32(base + STM32_SPI_SR_OFFSET);
+      regval = getreg32(base + STM32_SPI_CR1_OFFSET);
+      putreg32(regval | SPI_CR1_CSUSP, base + STM32_SPI_CR1_OFFSET);
+      while ((getreg32(base + STM32_SPI_SR_OFFSET) & SPI_SR_SUSP) == 0);
+
+      if (dest)
+        {
+          *dest++ = word;
+        }
+    }
+}
+
+#define SPI_EXCHANGE_FIXED8_BUS(bus) \
+  static void __attribute__((noinline)) \
+  spi_exchange_fixed8_spi##bus(const void *txbuffer, void *rxbuffer, \
+                               size_t nwords) \
+  { \
+    spi_exchange_fixed8(STM32_SPI##bus##_BASE, txbuffer, rxbuffer, nwords); \
+  }
+
+#ifdef CONFIG_STM32H7_SPI1
+SPI_EXCHANGE_FIXED8_BUS(1)
+#endif
+#ifdef CONFIG_STM32H7_SPI2
+SPI_EXCHANGE_FIXED8_BUS(2)
+#endif
+#ifdef CONFIG_STM32H7_SPI3
+SPI_EXCHANGE_FIXED8_BUS(3)
+#endif
+#ifdef CONFIG_STM32H7_SPI5
+SPI_EXCHANGE_FIXED8_BUS(5)
+#endif
+#undef SPI_EXCHANGE_FIXED8_BUS
+
+static bool spi_exchange_fixed8_try(struct spi_dev_s *dev,
+                                    const void *txbuffer, void *rxbuffer,
+                                    size_t nwords)
+{
+#ifdef CONFIG_STM32H7_SPI1
+  if (dev == &g_spi1dev.spidev && g_spi1dev.nbits == 8 &&
+      g_spi1dev.config == FULL_DUPLEX)
+    {
+      spi_exchange_fixed8_spi1(txbuffer, rxbuffer, nwords);
+      return true;
+    }
+#endif
+#ifdef CONFIG_STM32H7_SPI2
+  if (dev == &g_spi2dev.spidev && g_spi2dev.nbits == 8 &&
+      g_spi2dev.config == FULL_DUPLEX)
+    {
+      spi_exchange_fixed8_spi2(txbuffer, rxbuffer, nwords);
+      return true;
+    }
+#endif
+#ifdef CONFIG_STM32H7_SPI3
+  if (dev == &g_spi3dev.spidev && g_spi3dev.nbits == 8 &&
+      g_spi3dev.config == FULL_DUPLEX)
+    {
+      spi_exchange_fixed8_spi3(txbuffer, rxbuffer, nwords);
+      return true;
+    }
+#endif
+#ifdef CONFIG_STM32H7_SPI5
+  if (dev == &g_spi5dev.spidev && g_spi5dev.nbits == 8 &&
+      g_spi5dev.config == FULL_DUPLEX)
+    {
+      spi_exchange_fixed8_spi5(txbuffer, rxbuffer, nwords);
+      return true;
+    }
+#endif
+  return false;
+}
+#endif /* CONFIG_ARM_TRUSTRAM_AW_CPU && AW_CPU_DEVICE_WINDOWS */
+
 #if !defined(CONFIG_STM32H7_SPI_DMA)
 static void spi_exchange(struct spi_dev_s *dev, const void *txbuffer,
                          void *rxbuffer, size_t nwords)
@@ -2080,6 +2188,13 @@ static void spi_exchange_nodma(struct spi_dev_s *dev,
   DEBUGASSERT(priv && priv->spibase);
 
   spiinfo("txbuffer=%p rxbuffer=%p nwords=%d\n", txbuffer, rxbuffer, nwords);
+
+#if defined(CONFIG_ARM_TRUSTRAM_AW_CPU) && defined(AW_CPU_DEVICE_WINDOWS)
+  if (spi_exchange_fixed8_try(dev, txbuffer, rxbuffer, nwords))
+    {
+      return;
+    }
+#endif
 
   /* Disable the DMA Requests */
 
